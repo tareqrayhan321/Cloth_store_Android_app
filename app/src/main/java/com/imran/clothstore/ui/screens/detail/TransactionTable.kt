@@ -163,14 +163,14 @@ private fun Cell(text: String, width: androidx.compose.ui.unit.Dp, grid: Color, 
     }
 }
 
-/** "2026-09-23" জাতীয় ISO তারিখকে "২৩/০৯/২০২৬" (দিন/মাস দুই অঙ্কে, বাংলা অঙ্কে) ফরম্যাটে দেখায় —
+/** "2026-09-23" জাতীয় ISO তারিখকে "২৩/০৯/২৬" (দিন/মাস/সালের শেষ দুই অঙ্ক, বাংলা অঙ্কে) ফরম্যাটে দেখায় —
  *  রেফারেন্স স্ক্রিনশটের টেবিল অনুযায়ী। পার্স ব্যর্থ হলে মূল স্ট্রিং বাংলা অঙ্কে ফেরত দেয়। */
 private fun formatDateShort(date: String): String {
     if (date.isBlank()) return "—"
     return try {
         val parsed = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(date.take(10))
             ?: return date.toBengaliDigits()
-        java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.US).format(parsed).toBengaliDigits()
+        java.text.SimpleDateFormat("dd/MM/yy", java.util.Locale.US).format(parsed).toBengaliDigits()
     } catch (e: Exception) {
         date.toBengaliDigits()
     }
