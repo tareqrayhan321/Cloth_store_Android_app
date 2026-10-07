@@ -40,7 +40,11 @@ fun TransactionTable(
     bottomPadding: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
-    val colWidths = listOf(96.dp, 72.dp, 116.dp, 100.dp, 108.dp, 76.dp, 200.dp)
+    // প্রথম ৬ কলাম (তারিখ..গজ) মিলে স্ক্রিনের প্রস্থ ভরে; মন্তব্য কলাম ডানে স্ক্রল করে দেখতে হবে
+    val baseWidths = listOf(62f, 42f, 74f, 64f, 72f, 46f)
+    val screenW = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    val scale = (screenW / baseWidths.sum()).coerceIn(0.9f, 1.3f)
+    val colWidths = baseWidths.map { (it * scale).dp } + 200.dp
     val headers = listOf("তারিখ", "ম্যামো", "পাওনা/প্রাপ্য", "জমা", "মোট বাকি", "গজ", "মন্তব্য")
     // পার্টি লেজারের এক্সেল টেবিলের সাথে হুবহু এক ভিজুয়াল: সাদা / হালকা-বেজ বিকল্প রো, একই গ্রিড ও হেডার রঙ
     val headerBg = Color(0xFF1E3A32)
@@ -65,8 +69,8 @@ fun TransactionTable(
                 ) {
                     Text(
                         text = h,
-                        modifier = Modifier.padding(horizontal = 6.dp),
-                        fontSize = 10.5.sp,
+                        modifier = Modifier.padding(horizontal = 2.dp),
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         textAlign = TextAlign.Center,
@@ -147,8 +151,8 @@ private fun Cell(text: String, width: androidx.compose.ui.unit.Dp, grid: Color, 
     ) {
         Text(
             text = text,
-            modifier = Modifier.padding(horizontal = 6.dp),
-            fontSize = 10.5.sp,
+            modifier = Modifier.padding(horizontal = 2.dp),
+            fontSize = 10.sp,
             fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
             color = color,
             textAlign = align,
