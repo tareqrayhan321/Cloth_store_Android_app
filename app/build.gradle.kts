@@ -45,6 +45,9 @@ android {
 }
 
 dependencies {
+    // ── Google Drive মেমো স্টোরেজ — drive.file স্কোপের OAuth টোকেনের জন্য (AuthorizationClient) ──
+    implementation("com.google.android.gms:play-services-auth:21.3.0")
+
     // ── Core / Compose ──
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
