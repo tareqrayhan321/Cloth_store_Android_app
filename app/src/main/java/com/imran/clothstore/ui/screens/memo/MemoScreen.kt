@@ -4,7 +4,6 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -86,7 +85,7 @@ private fun memoDate(ms: Long): String =
     if (ms <= 0) "" else SimpleDateFormat("dd/MM/yyyy", Locale.US).format(Date(ms)).toBengaliDigits()
 
 /**
- * পার্টির মেমো-ছবির গ্যালারি। ছবি Google Drive-এ, তালিকা (metadata) Firestore-এ।
+ * পার্টির মেমো-ছবির গ্যালারি। ছবি Google Drive-এ (Apps Script-এর মাধ্যমে), তালিকা (metadata) Firestore-এ।
  */
 @Composable
 fun MemoScreen(
@@ -97,17 +96,12 @@ fun MemoScreen(
     BackHandler(onBack = onBack)
     val context = LocalContext.current
     val memos by viewModel.memos.collectAsState()
-    val driveState by viewModel.driveState.collectAsState()
     val progress by viewModel.progress.collectAsState()
     val message by viewModel.message.collectAsState()
 
     var viewerIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     var addMenuOpen by remember { mutableStateOf(false) }
     var cameraUri by rememberSaveable { mutableStateOf<Uri?>(null) }
-
-    val consentLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartIntentSenderForResult()
-    ) { result -> viewModel.onConsentResult(result.data) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetMultipleContents()
@@ -121,11 +115,6 @@ fun MemoScreen(
         if (ok && uri != null) viewModel.upload(listOf(uri))
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.consent.collect { pi ->
-            consentLauncher.launch(IntentSenderRequest.Builder(pi).build())
-        }
-    }
     LaunchedEffect(message) {
         message?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
@@ -133,7 +122,7 @@ fun MemoScreen(
         }
     }
 
-    val canAdd = driveState == DriveState.CONNECTED && progress == null
+    val canAdd = viewModel.configured && progress == null
 
     Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
         // ── হেডার ──
@@ -199,33 +188,18 @@ fun MemoScreen(
             }
         }
 
-        // ── Drive সংযোগ ব্যানার ──
-        when (driveState) {
-            DriveState.NEEDS_CONSENT, DriveState.ERROR -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFFFF6DC))
-                        .padding(14.dp)
-                ) {
-                    Text(
-                        "মেমোর ছবি আপনার Google Drive-এ জমা থাকবে। একবার অনুমতি দিলেই চলবে।",
-                        fontSize = 13.sp, color = AppColors.TextPrimary
-                    )
-                    Button(
-                        onClick = { viewModel.connectDrive() },
-                        modifier = Modifier.padding(top = 10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.HeaderTeal)
-                    ) { Text("Google Drive সংযুক্ত করুন", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
-                }
-            }
-            DriveState.CHECKING -> Text(
-                "Google Drive যাচাই হচ্ছে…", fontSize = 12.sp, color = Color(0xFF6C6A64),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        // ── সেটআপ বাকি থাকলে সতর্কতা ──
+        if (!viewModel.configured) {
+            Text(
+                "ছবি জমার সেটআপ বাকি: MemoConfig.kt-এ Apps Script-এর URL ও কী বসাতে হবে।",
+                fontSize = 13.sp, color = AppColors.TextPrimary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFFFF6DC))
+                    .padding(14.dp)
             )
-            DriveState.CONNECTED -> Unit
         }
 
         // ── গ্যালারি ──
@@ -255,7 +229,7 @@ fun MemoScreen(
                             .background(Color(0xFFEFE9D8))
                             .clickable { viewerIndex = index }
                     ) {
-                        DriveImage(meta.driveFileId, viewModel, driveState, Modifier.fillMaxSize(), ContentScale.Crop)
+                        DriveImage(meta.driveFileId, viewModel, Modifier.fillMaxSize(), ContentScale.Crop)
                         Text(
                             memoDate(meta.createdAt),
                             fontSize = 10.sp, color = Color.White,
@@ -275,7 +249,6 @@ fun MemoScreen(
             memos = memos,
             startIndex = start,
             viewModel = viewModel,
-            driveState = driveState,
             onClose = { viewerIndex = null }
         )
     }
@@ -286,14 +259,13 @@ fun MemoScreen(
 private fun DriveImage(
     fileId: String,
     viewModel: MemoViewModel,
-    driveState: DriveState,
     modifier: Modifier,
     contentScale: ContentScale
 ) {
     var file by remember(fileId) { mutableStateOf<File?>(null) }
     var failed by remember(fileId) { mutableStateOf(false) }
 
-    LaunchedEffect(fileId, driveState) {
+    LaunchedEffect(fileId) {
         if (file == null) {
             failed = false
             val f = viewModel.imageFile(fileId)
@@ -322,7 +294,6 @@ private fun MemoViewer(
     memos: List<MemoMeta>,
     startIndex: Int,
     viewModel: MemoViewModel,
-    driveState: DriveState,
     onClose: () -> Unit
 ) {
     if (memos.isEmpty()) {
@@ -352,7 +323,6 @@ private fun MemoViewer(
                     ZoomableDriveImage(
                         fileId = meta.driveFileId,
                         viewModel = viewModel,
-                        driveState = driveState,
                         isCurrent = pagerState.currentPage == page,
                         onZoomChanged = { z -> if (pagerState.currentPage == page) zoomed = z }
                     )
@@ -410,7 +380,6 @@ private fun MemoViewer(
 private fun ZoomableDriveImage(
     fileId: String,
     viewModel: MemoViewModel,
-    driveState: DriveState,
     isCurrent: Boolean,
     onZoomChanged: (Boolean) -> Unit
 ) {
@@ -455,6 +424,6 @@ private fun ZoomableDriveImage(
             ),
         contentAlignment = Alignment.Center
     ) {
-        DriveImage(fileId, viewModel, driveState, Modifier.fillMaxSize(), ContentScale.Fit)
+        DriveImage(fileId, viewModel, Modifier.fillMaxSize(), ContentScale.Fit)
     }
 }

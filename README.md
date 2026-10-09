@@ -107,18 +107,19 @@ DB Connect → পাইকারি ক্যালকুলেটর → Fabri
 
 কোনো নির্দিষ্ট স্ক্রিনে বাগ পেলে বা কোনো অংশ ওয়েব অ্যাপের সাথে না মিললে জানাবেন — ঠিক করে দেব।
 
-## মেমো ছবি (Google Drive + Firestore metadata)
+## মেমো ছবি (Google Drive + Firestore metadata, ফোনে লগইন ছাড়া)
 
 পার্টি ডিটেইল পেইজের হেডারের ডান পাশে "মেমো" বাটন → মেমোর ছবির গ্যালারি (গ্যালারি/ক্যামেরা থেকে যোগ, পিঞ্চ-জুম, ডিলিট সিক্রেট কী সহ)।
 
-- **ছবি**: Google Drive-এ, `ImranClothStore-Memos` ফোল্ডারে (স্কোপ `drive.file` — অ্যাপ শুধু নিজের বানানো ফাইল দেখতে পায়)। আপলোডের আগে বড় পাশ ১৬০০px, JPEG ৮০-এ ছোট করা হয়।
-- **Firestore (শুধু metadata)**: `party_memos/{ক্যাটাগরি}_{entryId}/files/{driveFileId}` → `driveFileId, fileName, mimeType, sizeBytes, width, height, createdAt`। বড় `imran_store/backup` ডকুমেন্টে কিছু যোগ হয়নি।
-- কোড: `data/memo/` (DriveAuth, DriveClient, MemoRepository), `ui/screens/memo/`, `util/MemoImage.kt`।
+- **ছবি**: `tareqrayhan0@gmail.com`-এর Google Drive-এ, `ImranClothStore-Memos` ফোল্ডারে। অ্যাপ সরাসরি Drive-এ যায় না; একটা Google Apps Script web app (`apps-script/Code.gs`) মাঝখানে থাকে, তাই কোনো ফোনে Google লগইন লাগে না। আপলোডের আগে ছবি ছোট করা হয় (বড় পাশ ১৬০০px, JPEG ৮০)।
+- **Firestore (শুধু metadata)**: `party_memos/{ক্যাটাগরি}_{entryId}/files/{driveFileId}` → `driveFileId, fileName, mimeType, sizeBytes, width, height, createdAt`।
+- কোড: `data/memo/` (MemoConfig, DriveProxy, MemoRepository), `ui/screens/memo/`, `util/MemoImage.kt`।
 
-### একবারের সেটআপ (Google Cloud Console, প্রজেক্ট dokane-aa207)
-1. **Google Drive API** Enable করুন।
-2. **OAuth consent screen** কনফিগার করুন; অ্যাপ "Testing" মোডে থাকলে আপনার Gmail "Test users"-এ যোগ করুন।
-3. **Credentials → OAuth client ID → Android**: package `com.clothingstore.myandroidapp` + যে কী দিয়ে APK সাইন হয় তার SHA-1 (রিলিজ keystore-এর SHA-1; ডিবাগ বিল্ড টেস্ট করলে ডিবাগ কী-এর SHA-1-ও আলাদা client হিসেবে)।
-4. অ্যাপে প্রথমবার মেমো খুলে "Google Drive সংযুক্ত করুন" চাপুন এবং অ্যাকাউন্ট বেছে অনুমতি দিন।
+### একবারের সেটআপ
+1. `tareqrayhan0@gmail.com` দিয়ে <https://script.google.com> → New project। `apps-script/Code.gs`-এর পুরো কোড বসান।
+2. কোডের `SECRET`-এ একটা লম্বা গোপন কী দিন (যেমন ৩০+ অক্ষরের এলোমেলো লেখা)।
+3. Deploy → New deployment → Type: **Web app** → Execute as: **Me** → Who has access: **Anyone** → Deploy। প্রথমবার Drive-এর অনুমতি চাইবে — Allow করুন ("unverified app" দেখালে Advanced → Go to ... চাপুন)।
+4. যে `.../exec` URL পাবেন সেটা আর ওই গোপন কী `data/memo/MemoConfig.kt`-এর `SCRIPT_URL` ও `SCRIPT_KEY`-তে বসান, তারপর অ্যাপ বিল্ড করুন।
+5. স্ক্রিপ্ট বদলালে Deploy → Manage deployments → Edit → New version দিতে হবে (URL একই থাকে)।
 
-বহু ডিভাইসে একই ছবি দেখতে সব ডিভাইসে **একই Google অ্যাকাউন্ট** দিয়ে সংযুক্ত করতে হবে।
+নোট: কী অ্যাপের ভেতরে থাকে, তাই এটা ছোট ব্যক্তিগত ব্যবহারের জন্য যথেষ্ট; স্ক্রিপ্ট শুধু মেমোর ফোল্ডারের ফাইলেই হাত দেয়, Drive-এর বাকি কিছুতে নয়।
