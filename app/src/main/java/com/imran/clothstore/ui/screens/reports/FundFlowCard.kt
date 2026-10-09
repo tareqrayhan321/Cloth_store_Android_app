@@ -25,14 +25,35 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.imran.clothstore.data.model.WeeklyReport
 import com.imran.clothstore.util.toBengaliDigits
-import kotlin.math.min
 
 private data class PieSegment(val label: String, val value: Double, val color: Color)
+
+/**
+ * সতর্কতা ব্যানার ✕ দিয়ে বন্ধ করলে সেটা স্থায়ীভাবে মনে রাখা হয় (SharedPreferences)।
+ * চাবি = "<সপ্তাহ>|<সতর্কতার ধরন>" — তাই নতুন সপ্তাহের রিপোর্ট এলে চাবি বদলে যায়
+ * এবং সতর্কতা আবার নতুন করে দেখায়; একই সপ্তাহে বন্ধ করা সতর্কতা অ্যাপ রিস্টার্টেও ফিরে আসে না।
+ */
+private object AlertDismissStore {
+    private const val PREFS = "fund_flow_alerts"
+    private const val KEY = "dismissed"
+
+    fun load(context: android.content.Context): Set<String> =
+        context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+            .getStringSet(KEY, emptySet())?.toSet() ?: emptySet()
+
+    fun add(context: android.content.Context, entry: String): Set<String> {
+        val updated = load(context) + entry
+        context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet(KEY, updated).apply()
+        return updated
+    }
+}
 
 /**
  * ওয়েব অ্যাপের dashFundFlowCard (ffhRenderCashflowPie) এর সরলীকৃত সমতুল্য।
@@ -44,6 +65,15 @@ private data class PieSegment(val label: String, val value: Double, val color: C
  */
 @Composable
 fun FundFlowCard(latest: WeeklyReport?) {
+    val context = LocalContext.current
+    var dismissedKeys by remember { mutableStateOf(AlertDismissStore.load(context)) }
+    // একই সপ্তাহের রিপোর্ট আবার সেভ হলেও (id/ts বদলালেও) বছর+সপ্তাহ একই থাকে; পুরনো এন্ট্রিতে না থাকলে ts
+    val weekKey = latest?.let { if (it.year > 0 && it.week > 0) "${it.year}-W${it.week}" else "ts${it.ts}" }
+    fun isDismissed(type: String) = weekKey != null && "$weekKey|$type" in dismissedKeys
+    fun dismiss(type: String) {
+        if (weekKey != null) dismissedKeys = AlertDismissStore.add(context, "$weekKey|$type")
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -86,7 +116,7 @@ fun FundFlowCard(latest: WeeklyReport?) {
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(130.dp), contentAlignment = Alignment.Center) {
-                DonutChart(segments = segments, modifier = Modifier.size(130.dp))
+                PieChart(segments = segments, modifier = Modifier.size(130.dp))
             }
             Column(
                 modifier = Modifier
@@ -117,76 +147,88 @@ fun FundFlowCard(latest: WeeklyReport?) {
         val netCashFlow = latest.cashIn - latest.cashOut
         val creditSalesRatio = if (latest.sales > 0) (latest.sales - latest.cashIn).coerceAtLeast(0.0) / latest.sales else 0.0
 
-        if (latest.net < 0) {
+        if (latest.net < 0 && !isDismissed("loss")) {
             AlertBanner(
                 dot = Color(0xFFD9452B),
                 badge = "CRITICAL LOSS",
                 title = "নিট লোকসান সতর্কতা — Net Loss Alert",
                 desc = "এই সপ্তাহে মোট ব্যয় আয়কে ছাড়িয়ে গেছে। COGS ও পরিচালন ব্যয় পুনর্যাচাই করুন।",
                 action = "১. COGS পুনর্যাচাই ২. পরিচালন ব্যয় কমানোর সুযোগ দেখুন ৩. বিক্রয়মূল্য পর্যালোচনা করুন",
-                bg = Color(0xFFFBEAE7)
+                bg = Color(0xFFFBEAE7),
+                onDismiss = { dismiss("loss") }
             )
         }
-        if (creditSalesRatio > 0.6) {
+        if (creditSalesRatio > 0.6 && !isDismissed("liquidity")) {
             AlertBanner(
                 dot = Color(0xFFE0B84A),
                 badge = "WARNING — Liquidity Risk",
                 title = "তারল্য ঝুঁকি — Credit Sales > 60%",
                 desc = "মোট বিক্রয়ের ৬০%-এর বেশি বাকিতে। নগদ প্রবাহে সমস্যার ঝুঁকি আছে।",
                 action = "১. পুরনো বাকি আদায় ত্বরান্বিত করুন ২. Cash Discount বিবেচনা করুন",
-                bg = Color.White
+                bg = Color.White,
+                onDismiss = { dismiss("liquidity") }
             )
         }
-        if (latest.net > 0 && netCashFlow < 0) {
+        if (latest.net > 0 && netCashFlow < 0 && !isDismissed("gap")) {
             AlertBanner(
                 dot = Color(0xFF2F6DB5),
                 badge = "INFO — Accrual Gap",
                 title = "নগদ ঘাটতি — P&L লাভ সত্ত্বেও Cashflow ঋণাত্মক",
                 desc = "বাকি ক্রয় বা বকেয়া পরিশোধ ক্যাশফ্লো কমাচ্ছে।",
                 action = "১. বাকি আদায় আগে করুন ২. ক্রয় পেমেন্ট সিডিউল পুনর্বিন্যাস করুন",
-                bg = Color(0xFFE9F1FB)
+                bg = Color(0xFFE9F1FB),
+                onDismiss = { dismiss("gap") }
             )
         }
     }
 }
 
+/** ভরাট পাই-চার্ট (মাঝখানে ফাঁকা নেই) — সেগমেন্টের মাঝে পাতলা সাদা বিভাজক রেখা */
 @Composable
-private fun DonutChart(segments: List<PieSegment>, modifier: Modifier = Modifier) {
+private fun PieChart(segments: List<PieSegment>, modifier: Modifier = Modifier) {
     val total = segments.sumOf { it.value }.let { if (it == 0.0) 1.0 else it }
 
     Canvas(modifier = modifier) {
-        val strokeWidth = size.minDimension * 0.28f
-        val radius = (min(size.width, size.height) - strokeWidth) / 2f
+        val radius = size.minDimension / 2f - 1.dp.toPx()
         val center = Offset(size.width / 2f, size.height / 2f)
-        var startAngle = -90f
+        val topLeft = Offset(center.x - radius, center.y - radius)
+        val arcSize = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
 
+        var startAngle = -90f
         segments.forEach { seg ->
             val sweep = (seg.value / total * 360f).toFloat()
             drawArc(
                 color = seg.color,
                 startAngle = startAngle,
                 sweepAngle = sweep,
-                useCenter = false,
-                topLeft = Offset(center.x - radius, center.y - radius),
-                size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
-                style = Stroke(width = strokeWidth)
-            )
-            // সেগমেন্টের বাইরের/ভেতরের গাঢ় আউটলাইন (রেফারেন্স ডোনাটের মতো)
-            drawArc(
-                color = Color(0xFF3A3A3A),
-                startAngle = startAngle,
-                sweepAngle = sweep,
-                useCenter = false,
-                topLeft = Offset(center.x - radius - strokeWidth / 2f, center.y - radius - strokeWidth / 2f),
-                size = androidx.compose.ui.geometry.Size((radius + strokeWidth / 2f) * 2, (radius + strokeWidth / 2f) * 2),
-                style = Stroke(width = 1.5.dp.toPx())
+                useCenter = true,
+                topLeft = topLeft,
+                size = arcSize
             )
             startAngle += sweep
+        }
+
+        // সেগমেন্টগুলোর মাঝে সাদা বিভাজক (একটাই সেগমেন্ট হলে দরকার নেই)
+        if (segments.size > 1) {
+            startAngle = -90f
+            segments.forEach { seg ->
+                val sweep = (seg.value / total * 360f).toFloat()
+                drawArc(
+                    color = Color.White,
+                    startAngle = startAngle,
+                    sweepAngle = sweep,
+                    useCenter = true,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = 1.5.dp.toPx())
+                )
+                startAngle += sweep
+            }
         }
     }
 }
 
-/** dismissAlert() এর সমতুল্য — ✕ ট্যাপ করলে ব্যানার লোকালি বন্ধ হয়ে যায় */
+/** dismissAlert() এর সমতুল্য — ✕ ট্যাপ করলে onDismiss কল হয় (স্থায়ীভাবে মনে রাখা হয়, দেখুন AlertDismissStore) */
 @Composable
 private fun AlertBanner(
     dot: Color,
@@ -194,11 +236,9 @@ private fun AlertBanner(
     title: String,
     desc: String,
     action: String,
-    bg: Color
+    bg: Color,
+    onDismiss: () -> Unit
 ) {
-    var dismissed by remember { mutableStateOf(false) }
-    if (dismissed) return
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -229,7 +269,7 @@ private fun AlertBanner(
             modifier = Modifier
                 .padding(start = 6.dp)
                 .clip(CircleShape)
-                .clickable { dismissed = true }
+                .clickable(onClick = onDismiss)
                 .padding(4.dp)
         )
     }
