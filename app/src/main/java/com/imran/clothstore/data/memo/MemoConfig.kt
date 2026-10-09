@@ -5,7 +5,7 @@ package com.imran.clothstore.data.memo
  * SCRIPT_KEY অবশ্যই Code.gs-এর SECRET-এর সাথে হুবহু এক হতে হবে।
  */
 object MemoConfig {
-    const val SCRIPT_URL = "PASTE_WEB_APP_URL_HERE"   // https://script.google.com/macros/s/.../exec
+    const val SCRIPT_URL = "https://script.google.com/macros/s/AKfycbydx3isivW5XvE-x40N3YQN1nT1iW2-R-CNOg2txMXz2cdbJzzF__xMQkxMgYuG7kKr/exec"
     const val SCRIPT_KEY = "CHANGE_ME"
 
     val isConfigured: Boolean

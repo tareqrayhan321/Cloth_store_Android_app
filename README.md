@@ -111,15 +111,16 @@ DB Connect → পাইকারি ক্যালকুলেটর → Fabri
 
 পার্টি ডিটেইল পেইজের হেডারের ডান পাশে "মেমো" বাটন → মেমোর ছবির গ্যালারি (গ্যালারি/ক্যামেরা থেকে যোগ, পিঞ্চ-জুম, ডিলিট সিক্রেট কী সহ)।
 
-- **ছবি**: `tareqrayhan0@gmail.com`-এর Google Drive-এ, `ImranClothStore-Memos` ফোল্ডারে। অ্যাপ সরাসরি Drive-এ যায় না; একটা Google Apps Script web app (`apps-script/Code.gs`) মাঝখানে থাকে, তাই কোনো ফোনে Google লগইন লাগে না। আপলোডের আগে ছবি ছোট করা হয় (বড় পাশ ১৬০০px, JPEG ৮০)।
+- **ছবি**: Apps Script যে Google account-এ deploy করা হয়েছে, সেই account-এর Drive-এ `ImranClothStore-Memos` ফোল্ডারে। অ্যাপ সরাসরি Drive-এ যায় না; একটা Google Apps Script web app (`apps-script/Code.gs`) মাঝখানে থাকে, তাই কোনো ফোনে Google লগইন লাগে না। আপলোডের আগে ছবি ছোট করা হয় (বড় পাশ ১৬০০px, JPEG ৮০)।
 - **Firestore (শুধু metadata)**: `party_memos/{ক্যাটাগরি}_{entryId}/files/{driveFileId}` → `driveFileId, fileName, mimeType, sizeBytes, width, height, createdAt`।
 - কোড: `data/memo/` (MemoConfig, DriveProxy, MemoRepository), `ui/screens/memo/`, `util/MemoImage.kt`।
 
 ### একবারের সেটআপ
-1. `tareqrayhan0@gmail.com` দিয়ে <https://script.google.com> → New project। `apps-script/Code.gs`-এর পুরো কোড বসান।
+1. যে Google account-এর Drive-এ ছবি রাখতে চান, সেটি দিয়ে <https://script.google.com> → New project খুলুন। `apps-script/Code.gs`-এর পুরো কোড বসান।
 2. কোডের `SECRET`-এ একটা লম্বা গোপন কী দিন (যেমন ৩০+ অক্ষরের এলোমেলো লেখা)।
 3. Deploy → New deployment → Type: **Web app** → Execute as: **Me** → Who has access: **Anyone** → Deploy। প্রথমবার Drive-এর অনুমতি চাইবে — Allow করুন ("unverified app" দেখালে Advanced → Go to ... চাপুন)।
-4. যে `.../exec` URL পাবেন সেটা আর ওই গোপন কী `data/memo/MemoConfig.kt`-এর `SCRIPT_URL` ও `SCRIPT_KEY`-তে বসান, তারপর অ্যাপ বিল্ড করুন।
+4. এই deployment-এর URL `data/memo/MemoConfig.kt`-এ বসানো আছে। গোপন কীটি ওই ফাইলের `SCRIPT_KEY`-তে আপনার local working copy-তে বসিয়ে অ্যাপ বিল্ড করুন।
+   **গুরুত্বপূর্ণ:** এই repository public, তাই `SECRET`/`SCRIPT_KEY` কখনো GitHub-এ commit বা push করবেন না। ফোনের অ্যাপে রাখা key APK থেকে বের করা সম্ভব; private/test deployment-এর জন্যই ব্যবহার করুন।
 5. স্ক্রিপ্ট বদলালে Deploy → Manage deployments → Edit → New version দিতে হবে (URL একই থাকে)।
 
-নোট: কী অ্যাপের ভেতরে থাকে, তাই এটা ছোট ব্যক্তিগত ব্যবহারের জন্য যথেষ্ট; স্ক্রিপ্ট শুধু মেমোর ফোল্ডারের ফাইলেই হাত দেয়, Drive-এর বাকি কিছুতে নয়।
+নিরাপত্তা: স্ক্রিপ্টটি ফাইল অপারেশন `ImranClothStore-Memos` ফোল্ডারে সীমাবদ্ধ রাখে, কিন্তু Android APK-তে থাকা shared key গোপন রাখা যায় না। key ফাঁস হলে ওই ফোল্ডারের ফাইল অননুমোদিতভাবে পড়া, যোগ করা বা মুছে ফেলা সম্ভব—তাই এটিকে public app বা sensitive data-এর জন্য ব্যবহার করবেন না।

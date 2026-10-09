@@ -1,7 +1,7 @@
 /**
  * মেমোর ছবির স্টোরেজ — Google Apps Script (Web app)।
- * এই স্ক্রিপ্ট tareqrayhan0@gmail.com অ্যাকাউন্টে বানাতে ও ডেপ্লয় করতে হবে
- * (Execute as: Me, Who has access: Anyone)। ছবি ওই অ্যাকাউন্টের Drive-এর
+ * যে Google account-এর Drive-এ ছবি রাখতে চান, সেই account-এ এই স্ক্রিপ্ট deploy করুন
+ * (Execute as: Me, Who has access: Anyone)। ছবি deploy করা account-এর Drive-এর
  * "ImranClothStore-Memos" ফোল্ডারে জমা হয়; এর বাইরের কোনো ফাইলে হাত দেয় না।
  */
 const SECRET = 'CHANGE_ME';              // MemoConfig.kt-এর SCRIPT_KEY-এর সাথে হুবহু মিলতে হবে
