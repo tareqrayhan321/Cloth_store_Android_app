@@ -4,6 +4,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -104,7 +105,7 @@ fun MemoScreen(
     var cameraUri by rememberSaveable { mutableStateOf<Uri?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetMultipleContents()
+        ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris -> if (uris.isNotEmpty()) viewModel.upload(uris) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -159,7 +160,12 @@ fun MemoScreen(
                     DropdownMenuItem(
                         text = { Text("গ্যালারি থেকে (একাধিক)") },
                         leadingIcon = { Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null) },
-                        onClick = { addMenuOpen = false; galleryLauncher.launch("image/*") }
+                        onClick = {
+                            addMenuOpen = false
+                            galleryLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        }
                     )
                     DropdownMenuItem(
                         text = { Text("ক্যামেরা") },

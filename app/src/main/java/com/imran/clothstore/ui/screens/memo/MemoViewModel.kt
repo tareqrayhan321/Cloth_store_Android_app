@@ -88,8 +88,9 @@ class MemoViewModel(
     }
 
     private suspend fun uploadOne(uri: Uri) {
-        val img = withContext(Dispatchers.IO) { MemoImage.compress(appContext.contentResolver, uri) }
-            ?: throw IllegalStateException("ছবি পড়া যায়নি")
+        val img = withContext(Dispatchers.IO) {
+            MemoImage.compress(appContext.contentResolver, uri, appContext.cacheDir)
+        }
         val now = System.currentTimeMillis()
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date(now))
         val safeName = partyName.replace(Regex("[\\\\/:*?\"<>|']"), "").trim().take(40).ifBlank { "party" }
