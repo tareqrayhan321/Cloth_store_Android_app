@@ -30,7 +30,7 @@ import com.imran.clothstore.ui.theme.AppColors
 
 /**
  * ওয়েব অ্যাপের .kpi-strip.kpi-strip-3 → তিনটা .profit-kpi-card এর সমতুল্য।
- * Weekly Gross / Net / Cash Profit — মান ঋণাত্মক হলে Net/Cash কার্ড লালচে হয়ে "Loss" লেখা দেখায়
+ * Weekly Gross / Net / Cash Profit — মান ঋণাত্মক হলে Net/Cash কার্ডে "Loss" লেখা ও লাল সংখ্যা দেখায় (কার্ডের রং অপরিবর্তিত)
  * (রেফারেন্স স্ক্রিনশট: "Weekly Net Loss" গোলাপি কার্ড, লাল মান)।
  */
 @Composable
@@ -78,8 +78,9 @@ private fun ProfitKpiCard(
     isLoss: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
-    val bg = if (isLoss) Color(0xFFFDE8E8) else AppColors.CardCream
-    val border = if (isLoss) Color(0xFFF2A6A6) else AppColors.CardBorder
+    // লস হলেও কার্ডের রং বদলায় না — শুধু সংখ্যা লাল হয়
+    val bg = AppColors.CardCream
+    val border = AppColors.CardBorder
     Column(
         modifier = modifier
             .height(140.dp)
