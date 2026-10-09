@@ -40,12 +40,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.res.painterResource
+import com.imran.clothstore.R
 import com.imran.clothstore.data.memo.partyKeyOf
 import com.imran.clothstore.ui.screens.memo.MemoScreen
 import com.imran.clothstore.ui.screens.memo.MemoViewModel
@@ -77,6 +75,7 @@ fun DetailScreen(
     var deletingRow by remember { mutableStateOf<TxnRow?>(null) }
     var pendingEdit by remember { mutableStateOf<(() -> Unit)?>(null) }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -134,7 +133,7 @@ fun DetailScreen(
                     )
                 }
             }
-            // ── মেমো বাটন (ডান পাশে) — ক্লিকে মেমোর ছবির গ্যালারি ──
+            // ── ম্যামো বাটন (ডান পাশে) — ক্লিকে ম্যামোর ছবির গ্যালারি ──
             Row(
                 modifier = Modifier
                     .padding(start = 8.dp)
@@ -144,8 +143,13 @@ fun DetailScreen(
                     .padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Filled.PhotoLibrary, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                Text("  মেমো", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_memo),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text("  ম্যামো", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
             }
         }
         androidx.compose.foundation.layout.Box(
@@ -233,6 +237,21 @@ fun DetailScreen(
         }
     }
 
+    // ── ম্যামো গ্যালারি: Dialog নয়, একই উইন্ডোর ওপর ওভারলে — তাই হেডার সিস্টেম বার পর্যন্ত ভরাট হয় ──
+    if (showMemo) {
+        val appCtx = LocalContext.current.applicationContext
+        val memoVm = androidx.lifecycle.viewmodel.compose.viewModel<MemoViewModel>(
+            key = "memo_${category.name}_${entry.id}",
+            factory = MemoViewModelFactory(partyKeyOf(category.name, entry.id), entry.name, appCtx)
+        )
+        MemoScreen(
+            partyName = entry.name,
+            viewModel = memoVm,
+            onBack = { showMemo = false }
+        )
+    }
+    }
+
     // ── লং-প্রেস অ্যাকশন: এডিট / ডিলিট ──
     actionRow?.let { row ->
         androidx.compose.material3.AlertDialog(
@@ -317,23 +336,5 @@ fun DetailScreen(
                 viewModel.addJoma(memo, date, joma, note)
             }
         )
-    }
-    // ── মেমো গ্যালারি (পূর্ণ-স্ক্রিন) ──
-    if (showMemo) {
-        val appCtx = LocalContext.current.applicationContext
-        val memoVm = androidx.lifecycle.viewmodel.compose.viewModel<MemoViewModel>(
-            key = "memo_${category.name}_${entry.id}",
-            factory = MemoViewModelFactory(partyKeyOf(category.name, entry.id), entry.name, appCtx)
-        )
-        Dialog(
-            onDismissRequest = { showMemo = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
-        ) {
-            MemoScreen(
-                partyName = entry.name,
-                viewModel = memoVm,
-                onBack = { showMemo = false }
-            )
-        }
     }
 }
