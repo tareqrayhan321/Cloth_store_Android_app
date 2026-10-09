@@ -32,8 +32,33 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Prepare memo Apps Script key
+        shell: bash
+        env:
+          MEMO_SCRIPT_KEY: ${{ secrets.MEMO_SCRIPT_KEY }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+          key = os.environ.get("MEMO_SCRIPT_KEY", "").strip()
+          if not re.fullmatch(r"[0-9a-fA-F]{64}", key):
+              raise SystemExit("Missing or invalid Actions secret: MEMO_SCRIPT_KEY (expected 64 hexadecimal characters)")
+          config = Path("app/src/main/java/com/imran/clothstore/data/memo/MemoConfig.kt")
+          source = config.read_text(encoding="utf-8")
+          source, count = re.subn(r'const val SCRIPT_KEY = "CHANGE_ME"', f'const val SCRIPT_KEY = "{key}"', source, count=1)
+          if count != 1:
+              raise SystemExit("MemoConfig.kt placeholder was not found exactly once")
+          config.write_text(source, encoding="utf-8")
+          print("Memo Apps Script key prepared; secret value hidden.")
+          PY
+
       - name: Run unit tests and assemble debug APK
         run: ./gradlew testDebugUnitTest assembleDebug --stacktrace
+
+      - name: Remove temporary memo key
+        if: always()
+        run: git checkout -- app/src/main/java/com/imran/clothstore/data/memo/MemoConfig.kt
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -59,6 +84,27 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare memo Apps Script key
+        shell: bash
+        env:
+          MEMO_SCRIPT_KEY: ${{ secrets.MEMO_SCRIPT_KEY }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+          key = os.environ.get("MEMO_SCRIPT_KEY", "").strip()
+          if not re.fullmatch(r"[0-9a-fA-F]{64}", key):
+              raise SystemExit("Missing or invalid Actions secret: MEMO_SCRIPT_KEY (expected 64 hexadecimal characters)")
+          config = Path("app/src/main/java/com/imran/clothstore/data/memo/MemoConfig.kt")
+          source = config.read_text(encoding="utf-8")
+          source, count = re.subn(r'const val SCRIPT_KEY = "CHANGE_ME"', f'const val SCRIPT_KEY = "{key}"', source, count=1)
+          if count != 1:
+              raise SystemExit("MemoConfig.kt placeholder was not found exactly once")
+          config.write_text(source, encoding="utf-8")
+          print("Memo Apps Script key prepared; secret value hidden.")
+          PY
 
       - name: Set release version from tag
         run: |
@@ -158,3 +204,7 @@ jobs:
       - name: Remove temporary keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/clothstore-release.jks"
+
+      - name: Remove temporary memo key
+        if: always()
+        run: git checkout -- app/src/main/java/com/imran/clothstore/data/memo/MemoConfig.kt
