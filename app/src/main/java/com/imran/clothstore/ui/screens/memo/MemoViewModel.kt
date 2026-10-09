@@ -30,7 +30,7 @@ import java.util.Locale
 data class UploadProgress(val done: Int, val total: Int)
 
 /**
- * পার্টির মেমো-ছবি: ছবি যায় Google Drive-এ (Apps Script-এর মাধ্যমে, ফোনে লগইন ছাড়া),
+ * পার্টির ম্যামো-ছবি: ছবি যায় Google Drive-এ (Apps Script-এর মাধ্যমে, ফোনে লগইন ছাড়া),
  * metadata (ফাইল আইডি, নাম, সাইজ, সময়) যায় Firestore-এ।
  */
 class MemoViewModel(
@@ -46,7 +46,7 @@ class MemoViewModel(
     fun clearMessage() { _message.value = null }
 
     val memos: StateFlow<List<MemoMeta>> = repo.observe(partyKey)
-        .catch { _message.value = "মেমো তালিকা পড়া যায়নি: ${it.message}"; emit(emptyList()) }
+        .catch { _message.value = "ম্যামো তালিকা পড়া যায়নি: ${it.message}"; emit(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _progress = MutableStateFlow<UploadProgress?>(null)
@@ -88,9 +88,8 @@ class MemoViewModel(
     }
 
     private suspend fun uploadOne(uri: Uri) {
-        val img = withContext(Dispatchers.IO) {
-            MemoImage.compress(appContext.contentResolver, uri, appContext.cacheDir)
-        }
+        val img = withContext(Dispatchers.IO) { MemoImage.compress(appContext.contentResolver, uri) }
+            ?: throw IllegalStateException("ছবি পড়া যায়নি")
         val now = System.currentTimeMillis()
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date(now))
         val safeName = partyName.replace(Regex("[\\\\/:*?\"<>|']"), "").trim().take(40).ifBlank { "party" }

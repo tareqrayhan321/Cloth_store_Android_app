@@ -4,10 +4,10 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
@@ -46,6 +46,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -65,13 +66,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
+import androidx.core.view.WindowCompat
 import coil.compose.AsyncImage
 import com.imran.clothstore.data.memo.MemoMeta
 import com.imran.clothstore.ui.components.SecretKeyDialog
@@ -86,7 +87,7 @@ private fun memoDate(ms: Long): String =
     if (ms <= 0) "" else SimpleDateFormat("dd/MM/yyyy", Locale.US).format(Date(ms)).toBengaliDigits()
 
 /**
- * পার্টির মেমো-ছবির গ্যালারি। ছবি Google Drive-এ (Apps Script-এর মাধ্যমে), তালিকা (metadata) Firestore-এ।
+ * পার্টির ম্যামো-ছবির গ্যালারি। ছবি Google Drive-এ (Apps Script-এর মাধ্যমে), তালিকা (metadata) Firestore-এ।
  */
 @Composable
 fun MemoScreen(
@@ -105,7 +106,7 @@ fun MemoScreen(
     var cameraUri by rememberSaveable { mutableStateOf<Uri?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia()
+        ActivityResultContracts.GetMultipleContents()
     ) { uris -> if (uris.isNotEmpty()) viewModel.upload(uris) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -125,8 +126,26 @@ fun MemoScreen(
 
     val canAdd = viewModel.configured && progress == null
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
-        // ── হেডার ──
+    // হেডার সিস্টেম বার পর্যন্ত গাঢ় টিল — তাই স্ট্যাটাস বারের আইকন সাদা; বের হলে আগের অবস্থায় ফেরে
+    val view = LocalView.current
+    DisposableEffect(Unit) {
+        val window = (view.context as? android.app.Activity)?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        val previous = controller?.isAppearanceLightStatusBars
+        controller?.isAppearanceLightStatusBars = false
+        onDispose {
+            if (controller != null && previous != null) controller.isAppearanceLightStatusBars = previous
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+    ) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        // ── হেডার (ব্যাকগ্রাউন্ড আগে, তারপর statusBarsPadding — তাই টিল রং ওপরে সিস্টেম বার পর্যন্ত বাড়ে, লেখা আগের জায়গায় থাকে) ──
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -139,7 +158,7 @@ fun MemoScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ফিরে যান", tint = Color.White)
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text("মেমো", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("ম্যামো", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Text(
                     partyName.ifBlank { "—" } + if (memos.isNotEmpty()) " · ${memos.size.toBengaliDigits()}টি ছবি" else "",
                     color = Color(0xFFCFE3E4), fontSize = 12.sp, maxLines = 1
@@ -160,12 +179,7 @@ fun MemoScreen(
                     DropdownMenuItem(
                         text = { Text("গ্যালারি থেকে (একাধিক)") },
                         leadingIcon = { Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null) },
-                        onClick = {
-                            addMenuOpen = false
-                            galleryLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        }
+                        onClick = { addMenuOpen = false; galleryLauncher.launch("image/*") }
                     )
                     DropdownMenuItem(
                         text = { Text("ক্যামেরা") },
@@ -210,9 +224,9 @@ fun MemoScreen(
 
         // ── গ্যালারি ──
         if (memos.isEmpty()) {
-            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth().navigationBarsPadding(), contentAlignment = Alignment.Center) {
                 Text(
-                    "এখনো কোনো মেমোর ছবি নেই\nউপরের \"ছবি যোগ\" চাপুন",
+                    "এখনো কোনো ম্যামোর ছবি নেই\nউপরের \"ছবি যোগ\" চাপুন",
                     fontSize = 14.sp, color = Color(0xFF6C6A64),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
@@ -220,7 +234,7 @@ fun MemoScreen(
         } else {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier.weight(1f).fillMaxWidth().navigationBarsPadding(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
                     start = 8.dp, end = 8.dp, top = 8.dp, bottom = 24.dp
                 ),
@@ -258,6 +272,7 @@ fun MemoScreen(
             onClose = { viewerIndex = null }
         )
     }
+    }
 }
 
 /** Drive-এর ছবি দেখায় — ক্যাশে থাকলে সাথে সাথে, নাহলে নামিয়ে */
@@ -284,7 +299,7 @@ private fun DriveImage(
         when {
             f != null -> AsyncImage(
                 model = f,
-                contentDescription = "মেমোর ছবি",
+                contentDescription = "ম্যামোর ছবি",
                 contentScale = contentScale,
                 modifier = Modifier.fillMaxSize()
             )
@@ -313,11 +328,13 @@ private fun MemoViewer(
     var deleting by remember { mutableStateOf<MemoMeta?>(null) }
     var zoomed by remember { mutableStateOf(false) }
 
-    Dialog(
-        onDismissRequest = onClose,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+    BackHandler(onBack = onClose)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
     ) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             HorizontalPager(
                 state = pagerState,
                 userScrollEnabled = !zoomed,
@@ -369,12 +386,11 @@ private fun MemoViewer(
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 )
             }
-        }
     }
 
     deleting?.let { meta ->
         SecretKeyDialog(
-            message = "এই মেমোর ছবিটি Google Drive ও তালিকা থেকে মুছতে সিক্রেট কী দিন।",
+            message = "এই ম্যামোর ছবিটি Google Drive ও তালিকা থেকে মুছতে সিক্রেট কী দিন।",
             confirmLabel = "ডিলিট করুন",
             onConfirm = { viewModel.delete(meta); deleting = null; zoomed = false },
             onDismiss = { deleting = null }
