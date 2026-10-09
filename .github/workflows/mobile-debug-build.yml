@@ -1,0 +1,85 @@
+name: Build Android APK (mobile)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-debug:
+    name: Build private debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Validate Firebase config and prepare memo key
+        shell: bash
+        env:
+          MEMO_SCRIPT_KEY: ${{ secrets.MEMO_SCRIPT_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          firebase = Path("app/google-services.json")
+          if not firebase.is_file():
+              raise SystemExit("app/google-services.json is missing")
+          config = json.loads(firebase.read_text(encoding="utf-8"))
+          app_id = "com.clothingstore.myandroidapp"
+          packages = [
+              client.get("client_info", {}).get("android_client_info", {}).get("package_name", "")
+              for client in config.get("client", [])
+          ]
+          if app_id not in packages:
+              raise SystemExit(f"Firebase config must include Android package {app_id}")
+
+          key = os.environ.get("MEMO_SCRIPT_KEY", "").strip()
+          if not key:
+              raise SystemExit("Missing Actions secret: MEMO_SCRIPT_KEY")
+          if not re.fullmatch(r"[0-9a-fA-F]{64}", key):
+              raise SystemExit("MEMO_SCRIPT_KEY must be the 64-character key supplied for this deployment")
+
+          memo_config = Path("app/src/main/java/com/imran/clothstore/data/memo/MemoConfig.kt")
+          source = memo_config.read_text(encoding="utf-8")
+          source, count = re.subn(
+              r'const val SCRIPT_KEY = "CHANGE_ME"',
+              f'const val SCRIPT_KEY = "{key}"',
+              source,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("MemoConfig.kt placeholder was not found exactly once")
+          memo_config.write_text(source, encoding="utf-8")
+          print("Firebase package validated and memo key prepared; secret value hidden.")
+          PY
+
+      - name: Run unit tests and assemble debug APK
+        run: ./gradlew testDebugUnitTest assembleDebug --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clothstore-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Remove temporary memo key from runner workspace
+        if: always()
+        shell: bash
+        run: |
+          git checkout -- app/src/main/java/com/imran/clothstore/data/memo/MemoConfig.kt 2>/dev/null || true

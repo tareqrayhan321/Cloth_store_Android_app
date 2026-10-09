@@ -71,11 +71,9 @@ DB Connect → পাইকারি ক্যালকুলেটর → Fabri
 
 ## Android Studio-তে চালানোর আগে যা করতে হবে
 
-1. **Firebase সংযোগ**: Firebase Console থেকে আপনার প্রজেক্টের
-   `google-services.json` ফাইল ডাউনলোড করে `app/` ফোল্ডারে রাখুন
-   (এই ফাইলটা এখানে নেই — এতে সিক্রেট কী থাকে, তাই আমি বানাইনি)।
-   প্যাকেজ নাম মিলাতে হবে: `com.imran.clothstore`
-   (অথবা Firebase Console-এ গিয়ে এই নামে একটা নতুন Android অ্যাপ যোগ করুন)।
+1. **Firebase সংযোগ**: `app/google-services.json` ইতিমধ্যে রিপোজিটরিতে আছে এবং
+   `com.clothingstore.myandroidapp` package-এর জন্য কনফিগার করা। এই ফাইলটি বদলাবেন না;
+   মোবাইল build workflow চালানোর আগে এর package মিলিয়ে দেখে।
 
 2. **Firestore ডেটা স্ট্রাকচার**: রিপোজিটরি ওয়েব অ্যাপের সাথে হুবহু মিলিয়ে **একটামাত্র
    ডকুমেন্ট** ব্যবহার করে —
@@ -100,7 +98,7 @@ DB Connect → পাইকারি ক্যালকুলেটর → Fabri
 
 1. Android Studio-তে খুলে Gradle Sync করে **প্রথম compile error গুলো ঠিক করা** — এই এনভায়রনমেন্টে
    Android SDK না থাকায় আমি কম্পাইল করে দেখতে পারিনি, তাই ছোটখাটো টাইপ/ইম্পোর্ট মিসম্যাচ থাকতে পারে।
-2. আপনার Firestore প্রজেক্টে `google-services.json` যোগ করে প্রকৃত ডেটা দিয়ে পরীক্ষা করা।
+2. `google-services.json`-এর সঙ্গে সংযুক্ত Firebase/Firestore প্রজেক্টে প্রকৃত ডেটা দিয়ে পরীক্ষা করা।
 3. UI পালিশ — ছবি আপলোড (Entry/Fabric ফর্মে `photoUrl` ফিল্ড আছে কিন্তু আপলোড UI নেই),
    ড্র্যাগ-রিঅর্ডার, এবং কিছু মাইক্রো-অ্যানিমেশন যেগুলো এই ধাপে ইচ্ছাকৃতভাবে বাদ দেওয়া হয়েছে
    সময়-সাশ্রয়ী রাখতে।
@@ -116,11 +114,17 @@ DB Connect → পাইকারি ক্যালকুলেটর → Fabri
 - কোড: `data/memo/` (MemoConfig, DriveProxy, MemoRepository), `ui/screens/memo/`, `util/MemoImage.kt`।
 
 ### একবারের সেটআপ
+
 1. যে Google account-এর Drive-এ ছবি রাখতে চান, সেটি দিয়ে <https://script.google.com> → New project খুলুন। `apps-script/Code.gs`-এর পুরো কোড বসান।
 2. কোডের `SECRET`-এ একটা লম্বা গোপন কী দিন (যেমন ৩০+ অক্ষরের এলোমেলো লেখা)।
 3. Deploy → New deployment → Type: **Web app** → Execute as: **Me** → Who has access: **Anyone** → Deploy। প্রথমবার Drive-এর অনুমতি চাইবে — Allow করুন ("unverified app" দেখালে Advanced → Go to ... চাপুন)।
-4. এই deployment-এর URL `data/memo/MemoConfig.kt`-এ বসানো আছে। গোপন কীটি ওই ফাইলের `SCRIPT_KEY`-তে আপনার local working copy-তে বসিয়ে অ্যাপ বিল্ড করুন।
-   **গুরুত্বপূর্ণ:** এই repository public, তাই `SECRET`/`SCRIPT_KEY` কখনো GitHub-এ commit বা push করবেন না। ফোনের অ্যাপে রাখা key APK থেকে বের করা সম্ভব; private/test deployment-এর জন্যই ব্যবহার করুন।
+4. এই deployment-এর URL `data/memo/MemoConfig.kt`-এ বসানো আছে। GitHub Actions build-এর সময় key `MEMO_SCRIPT_KEY` secret থেকে অস্থায়ীভাবে নেওয়া হয়; key source code-এ বসাবেন বা commit করবেন না।
 5. স্ক্রিপ্ট বদলালে Deploy → Manage deployments → Edit → New version দিতে হবে (URL একই থাকে)।
 
-নিরাপত্তা: স্ক্রিপ্টটি ফাইল অপারেশন `ImranClothStore-Memos` ফোল্ডারে সীমাবদ্ধ রাখে, কিন্তু Android APK-তে থাকা shared key গোপন রাখা যায় না। key ফাঁস হলে ওই ফোল্ডারের ফাইল অননুমোদিতভাবে পড়া, যোগ করা বা মুছে ফেলা সম্ভব—তাই এটিকে public app বা sensitive data-এর জন্য ব্যবহার করবেন না।
+### GitHub মোবাইল থেকে APK build
+1. Repository → **Settings → Secrets and variables → Actions → New repository secret** খুলুন।
+2. Name দিন `MEMO_SCRIPT_KEY`; value হবে deployed Apps Script-এর `SECRET`-এর একই গোপন key। Save করুন। `google-services.json` ইতিমধ্যে `app/`-এ আছে; এর জন্য আলাদা secret লাগবে না।
+3. **Actions → Build Android APK (mobile) → Run workflow** নির্বাচন করে `main` branch-এ চালান।
+4. সফল হলে run-এর **Artifacts** অংশ থেকে `clothstore-debug-apk` ডাউনলোড করুন। এটি private repository-র artifact; কেবল repository access আছে এমন account-ই পাবে।
+
+নিরাপত্তা: রিপোজিটরি private হলেও Android APK-তে থাকা shared key গোপন রাখা যায় না। key ফাঁস হলে স্ক্রিপ্টের `ImranClothStore-Memos` ফোল্ডারের ফাইল অননুমোদিতভাবে পড়া, যোগ করা বা মুছে ফেলা সম্ভব—তাই এটিকে public app বা sensitive data-এর জন্য ব্যবহার করবেন না।
