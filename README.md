@@ -119,7 +119,7 @@ DB Connect → পাইকারি ক্যালকুলেটর → Fabri
 2. কোডের `SECRET`-এ একটা লম্বা গোপন কী দিন (যেমন ৩০+ অক্ষরের এলোমেলো লেখা)।
 3. Deploy → New deployment → Type: **Web app** → Execute as: **Me** → Who has access: **Anyone** → Deploy। প্রথমবার Drive-এর অনুমতি চাইবে — Allow করুন ("unverified app" দেখালে Advanced → Go to ... চাপুন)।
 4. এই deployment-এর URL `data/memo/MemoConfig.kt`-এ বসানো আছে। GitHub Actions build-এর সময় key `MEMO_SCRIPT_KEY` secret থেকে অস্থায়ীভাবে নেওয়া হয়; key source code-এ বসাবেন বা commit করবেন না।
-5. স্ক্রিপ্ট বদলালে Deploy → Manage deployments → Edit → New version দিতে হবে (URL একই থাকে)।
+5. স্ক্রিপ্ট বদলালে Deploy → Manage deployments → Edit → New version দিতে হবে (URL একই থাকে)। নতুন deployment তৈরি করলে URL বদলে যাবে; তখন `MemoConfig.kt`-এর `SCRIPT_URL` আপডেট করে নতুন APK build করুন।
 
 ### GitHub মোবাইল থেকে APK build
 1. Repository → **Settings → Secrets and variables → Actions → New repository secret** খুলুন।
