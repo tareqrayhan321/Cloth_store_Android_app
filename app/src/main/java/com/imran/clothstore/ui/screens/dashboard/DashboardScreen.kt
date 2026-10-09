@@ -64,9 +64,10 @@ fun DashboardScreen(
     val reports by reportsViewModel.reportsNewestFirst.collectAsState()
     val latestReport = reports.firstOrNull()
 
-    // ── Aggregate Report সামারি (In Stock / Out Stock) — সব সপ্তাহের যোগফল ──
-    val sumInStock = reports.sumOf { it.stockInYard }
-    val sumOutStock = reports.sumOf { it.stockOutYard }
+    // ── Aggregate Report সামারি (In Stock / Out Stock) — বর্তমান (সর্বশেষ) সপ্তাহের গজ ──
+    // KPI স্ট্রিপ ও পাই-চার্টের মতোই latestReport থেকে; সব সপ্তাহের যোগফল আলাদা ওভারলেতে (সর্বমোট) দেখা যায়
+    val curInStock = latestReport?.stockInYard ?: 0.0
+    val curOutStock = latestReport?.stockOutYard ?: 0.0
 
     Column(
         modifier = Modifier
@@ -121,7 +122,8 @@ fun DashboardScreen(
                 ) {
                     Text("Aggregate Report", fontSize = 16.sp, fontWeight = FontWeight.Normal, fontFamily = androidx.compose.ui.text.font.FontFamily.Serif)
                     Text(
-                        text = if (reports.isEmpty()) "কোনো ডাটা নেই" else "${reports.size.toBengaliDigits()} সপ্তাহের ডাটা",
+                        text = if (latestReport == null) "কোনো ডাটা নেই"
+                        else latestReport.label.ifBlank { "চলতি সপ্তাহ" }.toBengaliDigits(),
                         fontSize = 11.sp,
                         color = Color(0xFF6C6A64)
                     )
@@ -134,12 +136,12 @@ fun DashboardScreen(
                 ) {
                     AggStatBox(
                         label = "In Stock",
-                        value = "${yardNum(sumInStock)} Yard",
+                        value = "${yardNum(curInStock)} Yard",
                         modifier = Modifier.weight(1f)
                     )
                     AggStatBox(
                         label = "Out Stock",
-                        value = "${yardNum(sumOutStock)} Yard",
+                        value = "${yardNum(curOutStock)} Yard",
                         modifier = Modifier.weight(1f)
                     )
                 }
