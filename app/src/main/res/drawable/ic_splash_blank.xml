@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- সিস্টেম স্প্ল্যাশে কোনো স্থির আইকন নয় (আগের গোল লোগো বাদ) — খুললেই সরাসরি EMEAN মোশন ইন্ট্রো চলবে -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+</shape>

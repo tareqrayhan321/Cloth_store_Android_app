@@ -35,15 +35,26 @@ import com.imran.clothstore.update.UpdateInfo
 import com.imran.clothstore.ui.components.BottomNavBar
 import com.imran.clothstore.ui.components.BottomNavTab
 import com.imran.clothstore.ui.screens.menu.SideMenu
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.imran.clothstore.ui.intro.EmeanIntro
 import com.imran.clothstore.ui.theme.ImranClothStoreTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // সিস্টেম স্প্ল্যাশ (ক্রিম পট, কোনো স্থির লোগো নয়) — setContent-এর আগে
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             ImranClothStoreTheme {
-                AppRoot()
+                var introDone by remember { mutableStateOf(false) }
+                Box(Modifier.fillMaxSize()) {
+                    AppRoot()
+                    // EMEAN মোশন ইন্ট্রো — সতেজ চালুতে একবার, ট্যাপে স্কিপ (৩.৪ সে.)
+                    if (!introDone) {
+                        EmeanIntro(onDone = { introDone = true })
+                    }
+                }
             }
         }
     }

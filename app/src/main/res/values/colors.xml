@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- EMEAN ইন্ট্রোর ক্রিম পট — সিস্টেম স্প্ল্যাশও একই রঙ, যাতে স্প্ল্যাশ→ইন্ট্রো সিমলেস হয় -->
+    <color name="emean_splash_background">#FBF7F2</color>
+</resources>
