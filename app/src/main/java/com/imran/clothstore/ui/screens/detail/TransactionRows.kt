@@ -88,11 +88,14 @@ fun buildTransactionRows(entry: Entry, isCustomer: Boolean): List<TxnRow> {
     raw.clear()
     raw.addAll(sortedRaw)
 
-    // ── একই (non-empty) মেমোর bill + joma একসাথে merge করি এক রো-তে দেখানোর জন্য ──
-    // ওয়েব অ্যাপের fvOpenDetail() _mergeJoma প্যাটার্ন (index.html লাইন ৬১৫০-৬১৬৪) হুবহু অনুসরণ:
-    // প্রতিটা BILL রো-র জন্য (মেমো খালি না হলে) প্রথম না-মার্জ-হওয়া JOMA রো খোঁজা হয় একই
-    // (trim করা) মেমো দিয়ে; পাওয়া গেলে জমার অংশ mergedJomaAmount-এ রাখা হয় এবং সেই JOMA
-    // রো আউটপুট থেকে বাদ পড়ে (একবারই একটা JOMA কোনো একটা BILL-এর সাথে মার্জ হতে পারে)।
+    // ── bill + joma merge করে এক রো-তে দেখানো — নিয়মটা সব ক্ষেত্রে সমান (তারেকের নির্দেশ) ──
+    // বকেয়া/পাওনা ফর্মে একসাথে দেওয়া জমা সবসময় সেই বিলের লাইনেই বসবে। মার্জ হয় যেকোনো একভাবে:
+    //  (১) একই (non-empty, trim করা) মেমো — ওয়েব অ্যাপের _mergeJoma প্যাটার্ন (index.html ৬১৫০-৬১৬৪);
+    //  (২) মেমো না থাকলেও: একই তারিখে বিলের ঠিক পরের JOMA রো — ফর্ম জোড়া হিসেবে সেভ হওয়া জমা
+    //      (addBokeyoa/editRow/নতুন এন্ট্রি সব জায়গায় বিলের পরপরই জমা বসে)। আগে শুধু (১) ছিল,
+    //      তাই মেমো ফাঁকা থাকলে একই ফর্মের জমা আলাদা লাইনে চলে যেত — সেটাই ছিল অসঙ্গতি।
+    // পাওয়া গেলে জমার অংশ mergedJomaAmount-এ থাকে, JOMA রো আউটপুট থেকে বাদ পড়ে
+    // (একটা JOMA একবারই কোনো একটা BILL-এর সাথে মার্জ হতে পারে)।
     data class MergedTxn(
         val date: String, val memo: String, val type: TxnType,
         val amount: Double, val goj: String, val note: String,
@@ -104,12 +107,19 @@ fun buildTransactionRows(entry: Entry, isCustomer: Boolean): List<TxnRow> {
     val merged = mutableListOf<MergedTxn>()
     for (i in raw.indices) {
         val t = raw[i]
-        if (t.type == TxnType.BILL_OR_PAWNA && t.memo.trim().isNotEmpty()) {
+        if (t.type == TxnType.BILL_OR_PAWNA) {
+            val memoKey = t.memo.trim()
             var mateIdx = -1
             for (j in raw.indices) {
                 if (j == i || j in consumedJomaIdx) continue
                 val cand = raw[j]
-                if (cand.type == TxnType.JOMA && cand.memo.trim() == t.memo.trim()) {
+                if (cand.type != TxnType.JOMA) continue
+                val sameMemo = memoKey.isNotEmpty() && cand.memo.trim() == memoKey
+                // ফর্ম-জোড়া: একই তারিখে বিলের ঠিক পরের জমা — তবে জমার নিজের মেমো ফাঁকা হলেই
+                // (আলাদা মেমোওয়ালা জমা অন্য বিলের জোড়া হতে পারে, সেটা এই বিলে টানা যাবে না)
+                val formPair = j == i + 1 && t.date.isNotBlank() && cand.memo.trim().isEmpty() &&
+                    dateSortKey(cand.date) == dateSortKey(t.date)
+                if (sameMemo || formPair) {
                     mateIdx = j
                     break
                 }
