@@ -212,12 +212,12 @@ private fun AggStatBox(label: String, value: String, modifier: Modifier = Modifi
     }
 }
 
-/** "১০০" / "২,৯৮৮.২৫" — বাংলা অঙ্ক, হাজার-কমা, শেষে অপ্রয়োজনীয় শূন্য নেই (ইউনিট আলাদাভাবে "Yard" বসে) */
+/** "১০০" / "২,৯৮৮.২৫" — বাংলা অঙ্ক, লক্ষ-পদ্ধতির কমা, শেষে অপ্রয়োজনীয় শূন্য নেই (ইউনিট আলাদাভাবে "Yard" বসে) */
 private fun yardNum(v: Double): String {
     val r = kotlin.math.round(v * 100) / 100
     val whole = r.toLong()
     val frac = r - whole
-    val wholeStr = whole.toString().reversed().chunked(3).joinToString(",").reversed()
+    val wholeStr = com.imran.clothstore.util.groupLakh(whole.toString())
     val fracStr = if (frac == 0.0) "" else "." + "%.2f".format(java.util.Locale.US, frac).substringAfter(".").trimEnd('0')
     return (wholeStr + fracStr).toBengaliDigits()
 }
