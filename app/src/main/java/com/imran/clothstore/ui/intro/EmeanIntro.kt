@@ -51,6 +51,12 @@ import kotlin.math.sqrt
  * বানানো হয় (remember) — প্রতি ফ্রেমে শুধু চলমান ২-৩টা সেগমেন্টের আংশিক পথ হিসাব হয়,
  * শেষ হওয়া সেগমেন্ট ক্যাশ করা পথেই আঁকা হয়। মাস্ক-লেয়ার শুধু ইমব্লেম এলাকায়
  * (625×682), আর fade-লেয়ার কেবল fade চলাকালেই বসে।
+ *
+ * স্মুথ মোশন (2026-11-10 রাত, তারেকের ভিডিও দেখে): ফোন ব্যস্ত থাকলে ফ্রেম বাদ পড়ে —
+ * ঘড়ির সময় সরাসরি আঁকায় বসালে অ্যানিমেশন লাফ দিয়ে "ছিঁড়ে ছিঁড়ে" এগোয়। তাই আঁকার
+ * সময় (shown) আসল সময়ের (target) পেছনে মসৃণভাবে টানা হয় (lerp): ঝাঁকুনি এলেও গতি
+ * ধারাবাহিক থাকে, ধীরে ধীরে ধরে ফেলে। আর পুরো 2048×682 ছবি প্রতি ফ্রেমে না টেনে
+ * ইমব্লেম ও লেখার অংশ আগেই আলাদা ছোট বিটম্যাপে কেটে রাখা হয়।
  */
 
 private val IntroBg = Color(0xFFFBF7F2)
@@ -133,13 +139,17 @@ private fun SegDraw.partialPath(frac: Float): Path {
     return p
 }
 
-private fun DrawScope.drawLogoFull(logo: ImageBitmap, alpha: Float = 1f, blend: BlendMode = BlendMode.SrcOver) {
+/** আগেই কেটে রাখা ছোট বিটম্যাপ (ইমব্লেম/লেখার অংশ) তার আসল জায়গায় আঁকা — পুরো ছবির চেয়ে হালকা। */
+private fun DrawScope.drawLogoRegion(
+    bmp: ImageBitmap, dstX: Int, dstY: Int, w: Int, h: Int,
+    alpha: Float = 1f, blend: BlendMode = BlendMode.SrcOver,
+) {
     drawImage(
-        image = logo,
+        image = bmp,
         srcOffset = IntOffset.Zero,
-        srcSize = IntSize(logo.width, logo.height),
-        dstOffset = IntOffset.Zero,
-        dstSize = IntSize(2048, 682),
+        srcSize = IntSize(bmp.width, bmp.height),
+        dstOffset = IntOffset(dstX, dstY),
+        dstSize = IntSize(w, h),
         alpha = alpha,
         blendMode = blend,
     )
@@ -164,7 +174,7 @@ private fun DrawScope.drawEmblemDrawn(logo: ImageBitmap, segs: List<SegDraw>, fl
         for (polyPath in flowerPaths) {
             drawPath(path = polyPath, color = Color.Black, blendMode = BlendMode.Clear)
         }
-        drawLogoFull(logo, blend = BlendMode.SrcIn)
+        drawLogoRegion(logo, 0, 0, 625, 682, blend = BlendMode.SrcIn)
         drawContext.canvas.restore()
     }
 }
@@ -181,7 +191,7 @@ private fun DrawScope.drawPop(logo: ImageBitmap, polyPath: Path, center: FloatAr
         translate(-cx, -cy)
     }) {
         clipPath(polyPath) {
-            drawLogoFull(logo, alpha = e.coerceIn(0f, 1f))
+            drawLogoRegion(logo, 0, 0, 625, 682, alpha = e.coerceIn(0f, 1f))
         }
     }
 }
@@ -195,12 +205,13 @@ private fun DrawScope.drawTextLine(logo: ImageBitmap, t: Float, t0: Float, dur: 
     }
     if (cover <= 626f) return
     clipRect(625f, y0, min(cover, 2048f), y1) {
-        drawLogoFull(logo)
+        drawLogoRegion(logo, 625, 150, 1423, 410)
     }
 }
 
 private fun DrawScope.drawEmean(
-    logo: ImageBitmap,
+    emblemBmp: ImageBitmap,
+    textBmp: ImageBitmap,
     segs: List<SegDraw>,
     flowerPaths: List<Path>,
     t: Float,
@@ -213,20 +224,25 @@ private fun DrawScope.drawEmean(
         s = 1f + 0.02f * (0.5f - 0.5f * kotlin.math.cos(tri * PI.toFloat()))
     }
     withTransform({ scale(s, s, Offset(1024f, 341f)) }) {
-        drawEmblemDrawn(logo, segs, flowerPaths, t)
-        drawPop(logo, flowerPaths[0], POLY_BOT_CENTER, t, 1.45f)
-        drawPop(logo, flowerPaths[1], POLY_TOP_CENTER, t, 1.20f)
-        drawPop(logo, flowerPaths[2], POLY_BUD_CENTER, t, 1.65f)
-        drawTextLine(logo, t, 1.45f, 0.80f, 638f, 168f, 436f)
-        drawTextLine(logo, t, 1.90f, 0.70f, 630f, 448f, 548f)
+        drawEmblemDrawn(emblemBmp, segs, flowerPaths, t)
+        drawPop(emblemBmp, flowerPaths[0], POLY_BOT_CENTER, t, 1.45f)
+        drawPop(emblemBmp, flowerPaths[1], POLY_TOP_CENTER, t, 1.20f)
+        drawPop(emblemBmp, flowerPaths[2], POLY_BUD_CENTER, t, 1.65f)
+        drawTextLine(textBmp, t, 1.45f, 0.80f, 638f, 168f, 436f)
+        drawTextLine(textBmp, t, 1.90f, 0.70f, 630f, 448f, 548f)
     }
 }
 
 @Composable
 fun EmeanIntro(onDone: () -> Unit) {
     val context = LocalContext.current
-    val logo = remember {
-        BitmapFactory.decodeResource(context.resources, R.drawable.emean_logo).asImageBitmap()
+    // লোগো একবারই ডিকোড হয়; ইমব্লেম ও লেখার অংশ সেই একই বিটম্যাপ থেকে আলাদা ছোট
+    // বিটম্যাপে কেটে রাখা হয় — প্রতি ফ্রেমে পুরো 2048×682 ছবি টানতে হয় না।
+    val (emblemBmp, textBmp) = remember {
+        val full = BitmapFactory.decodeResource(context.resources, R.drawable.emean_logo)
+        val emblem = android.graphics.Bitmap.createBitmap(full, 0, 0, 625, 682).asImageBitmap()
+        val text = android.graphics.Bitmap.createBitmap(full, 625, 150, 1423, 410).asImageBitmap()
+        emblem to text
     }
     // আঁকার ডেটা একবারই বানানো হয় — প্রতি ফ্রেমে নয় (ল্যাগ-ফিক্স)
     val segs = remember { EMEAN_SEGS.map { SegDraw(it) } }
@@ -243,11 +259,24 @@ fun EmeanIntro(onDone: () -> Unit) {
     }
     LaunchedEffect(Unit) {
         var start = -1L
+        var prev = -1L
+        var shown = 0f
         while (!finished) {
             val now = withFrameNanos { it }
-            if (start < 0L) start = now
-            t = (now - start) / 1_000_000_000f
-            if (t >= TOTAL + FADE) break
+            if (start < 0L) {
+                start = now
+                prev = now
+            }
+            val target = (now - start) / 1_000_000_000f
+            val dtMs = ((now - prev) / 1_000_000f).coerceIn(1f, 100f)
+            prev = now
+            // মসৃণ অনুসরণ: প্রতি ফ্রেমে ফাঁকের একটা অংশ এগোনো হয় (60fps-এ ~45%) —
+            // ফ্রেম বাদ পড়লেও আঁকা লাফ দেয় না, গ্লাইড করে ধরে ফেলে।
+            val k = 1f - Math.pow(0.55, (dtMs / 16.7).toDouble()).toFloat()
+            shown += (target - shown) * k
+            if (target > TOTAL && shown > target - 0.02f) shown = target
+            t = shown
+            if (target >= TOTAL + FADE && shown >= TOTAL + FADE - 0.03f) break
         }
         finish()
     }
@@ -268,10 +297,10 @@ fun EmeanIntro(onDone: () -> Unit) {
                 if (fadeAlpha < 1f) {
                     // fade-লেয়ার কেবল fade-এর ০.৩ সেকেন্ডেই (আগে প্রতি ফ্রেমে বসত)
                     drawContext.canvas.saveLayer(Rect(0f, 0f, 2048f, 682f), Paint().apply { alpha = fadeAlpha })
-                    drawEmean(logo, segs, flowerPaths, t)
+                    drawEmean(emblemBmp, textBmp, segs, flowerPaths, t)
                     drawContext.canvas.restore()
                 } else {
-                    drawEmean(logo, segs, flowerPaths, t)
+                    drawEmean(emblemBmp, textBmp, segs, flowerPaths, t)
                 }
             }
         }
