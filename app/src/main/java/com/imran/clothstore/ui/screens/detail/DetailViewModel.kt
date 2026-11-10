@@ -47,28 +47,34 @@ class DetailViewModel(
         }
     }
 
+    /** নতুন জোড়া-চিহ্ন: বিদ্যমান সর্বোচ্চ pair ও বর্তমান সময়ের চেয়ে বড় একটি অনন্য মান */
+    private fun nextPairId(history: List<HistoryItem>): Long =
+        maxOf(System.currentTimeMillis(), (history.maxOfOrNull { it.pair } ?: 0L) + 1)
+
     /** নতুন বকেয়া/বিল (ও ঐচ্ছিক সাথে জমা) যোগ করে — কাস্টমার ও মহাজন উভয়ের জন্য */
     fun addBokeyoa(memo: String, date: String, goj: String, billAmount: Double, note: String, jomaAmount: Double) {
         val current = _entry.value
         val newHistory = current.history.toMutableList()
+        // একই ফর্মের বকেয়া+জমা একই pair পায় — টেবিলে জমাটা এই বিলের লাইনেই মার্জ হবে
+        val pid = nextPairId(current.history)
         // ওয়েব অ্যাপের মতোই: কাস্টমার হলে bill ফিল্ডে, মহাজন হলে baki ফিল্ডে বকেয়ার পরিমাণ রাখা হয়
         val historyItem = if (category.isCustomerType) {
-            HistoryItem(type = "bokeyoa", date = date, memo = memo, bill = billAmount, goj = goj, note = note)
+            HistoryItem(type = "bokeyoa", date = date, memo = memo, bill = billAmount, goj = goj, note = note, pair = pid)
         } else {
-            HistoryItem(type = "bokeyoa", date = date, memo = memo, baki = billAmount, goj = goj, note = note)
+            HistoryItem(type = "bokeyoa", date = date, memo = memo, baki = billAmount, goj = goj, note = note, pair = pid)
         }
         newHistory.add(historyItem)
         if (jomaAmount > 0) {
-            newHistory.add(HistoryItem(type = "joma", date = date, memo = memo, joma = jomaAmount))
+            newHistory.add(HistoryItem(type = "joma", date = date, memo = memo, joma = jomaAmount, pair = pid))
         }
         recalculateAndSave(current.copy(history = newHistory))
     }
 
-    /** শুধু জমা যোগ করে */
+    /** শুধু জমা যোগ করে — আলাদা ফর্মের জমা, তাই নিজস্ব pair: কোনো বিলের লাইনে মার্জ হবে না */
     fun addJoma(memo: String, date: String, jomaAmount: Double, note: String) {
         val current = _entry.value
         val newHistory = current.history.toMutableList()
-        newHistory.add(HistoryItem(type = "joma", date = date, memo = memo, joma = jomaAmount, note = note))
+        newHistory.add(HistoryItem(type = "joma", date = date, memo = memo, joma = jomaAmount, note = note, pair = nextPairId(current.history)))
         recalculateAndSave(current.copy(history = newHistory))
     }
 
@@ -123,6 +129,18 @@ class DetailViewModel(
                 }
             }
             val js = row.jomaSrc
+            if (js == null && jomaAmount > 0) {
+                // এডিট ফর্ম থেকে এই বিলের সাথে নতুন জমা — একই ফর্ম, তাই জোড়া বাঁধা হয়:
+                // history-বিল হলে তার pair-ই (না থাকলে নতুন pair বানিয়ে বিলেও বসানো হয়),
+                // মূল এন্ট্রির বিল হলে PAIR_WITH_BASE।
+                val pid = when {
+                    row.src == SRC_BASE_BILL -> PAIR_WITH_BASE
+                    row.src in hist.indices && hist[row.src].pair != 0L -> hist[row.src].pair
+                    row.src in hist.indices -> nextPairId(hist).also { hist[row.src] = hist[row.src].copy(pair = it) }
+                    else -> nextPairId(hist)
+                }
+                appended += HistoryItem(type = "joma", date = newDate, memo = memo, joma = jomaAmount, pair = pid)
+            }
             if (js != null) {
                 if (jomaAmount > 0) {
                     if (js == SRC_BASE_JOMA) e = e.copy(joma = jomaAmount, memo = memo)
@@ -130,8 +148,6 @@ class DetailViewModel(
                 } else {
                     if (js == SRC_BASE_JOMA) e = e.copy(joma = 0.0) else removeIdx += js
                 }
-            } else if (jomaAmount > 0) {
-                appended += HistoryItem(type = "joma", date = newDate, memo = memo, joma = jomaAmount)
             }
         } else {
             if (row.src == SRC_BASE_JOMA) {

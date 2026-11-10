@@ -98,7 +98,9 @@ data class BackupHistoryItem(
     val baki: Double = 0.0,
     val joma: Double = 0.0,
     val goj: String = "",
-    val note: String = ""
+    val note: String = "",
+    /** জোড়া-চিহ্ন — Entry.kt-এর HistoryItem.pair দেখুন; ওয়েব অ্যাপ ফিল্ডটা উপেক্ষা করে */
+    val pair: Long = 0L
 )
 
 /** fabricPurchaseData_v2 এর একটা গ্রুপ — id সংখ্যা */

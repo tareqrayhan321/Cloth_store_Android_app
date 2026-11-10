@@ -12,8 +12,8 @@ data class TxnRow(
     val goj: String,
     val note: String,
     /**
-     * একই (non-empty) মেমোর bill + joma মার্জ হলে জমার অংশ এখানে থাকে (ওয়েব অ্যাপের
-     * _mergeJoma প্যাটার্ন — index.html লাইন ৬১৫০-৬১৬৪)। null মানে এই রো merge হয়নি —
+     * একই ফর্ম থেকে সেভ হওয়া bill + joma মার্জ হলে জমার অংশ এখানে থাকে (জোড়া-চিহ্ন
+     * pair দিয়ে; চিহ্নহীন পুরনো ডেটায় মেমো-মিলে)। null মানে এই রো merge হয়নি —
      * টেবিলের "জমা" কলামে তখন "—" দেখানো হয়। শুধু BILL_OR_PAWNA টাইপ রো-তেই সেট হতে পারে।
      */
     val mergedJomaAmount: Double? = null,
@@ -28,6 +28,13 @@ const val SRC_BASE_BILL = -1
 /** মূল এন্ট্রির joma ফিল্ড থেকে আসা রো */
 const val SRC_BASE_JOMA = -2
 
+/**
+ * মূল এন্ট্রির (একই এন্ট্রি-ফর্মের) bill+joma জোড়ার pair মান — entry.bill ও entry.joma
+ * একই ফর্মের দুই ফিল্ড, তাই সবসময় এক লাইনে মার্জ হয়। এডিটে মূল বিলের সাথে যোগ হওয়া
+ * জমাও এই pair পায়। (HistoryItem.pair-এর 0 = চিহ্নহীন পুরনো ডেটা।)
+ */
+const val PAIR_WITH_BASE = -1L
+
 enum class TxnType { BILL_OR_PAWNA, JOMA }
 
 /**
@@ -41,22 +48,24 @@ enum class TxnType { BILL_OR_PAWNA, JOMA }
 fun buildTransactionRows(entry: Entry, isCustomer: Boolean): List<TxnRow> {
     data class RawTxn(
         val date: String, val memo: String, val type: TxnType,
-        val amount: Double, val goj: String, val note: String, val src: Int
+        val amount: Double, val goj: String, val note: String, val src: Int,
+        /** জোড়া-চিহ্ন: একই ফর্মের bill+joma-তে একই মান (HistoryItem.pair / PAIR_WITH_BASE); 0 = পুরনো ডেটা */
+        val pair: Long = 0L
     )
 
     val raw = mutableListOf<RawTxn>()
 
     if (isCustomer) {
         if (entry.bill > 0) {
-            raw.add(RawTxn(entry.date, entry.memo, TxnType.BILL_OR_PAWNA, entry.bill, entry.goj, entry.note, SRC_BASE_BILL))
+            raw.add(RawTxn(entry.date, entry.memo, TxnType.BILL_OR_PAWNA, entry.bill, entry.goj, entry.note, SRC_BASE_BILL, PAIR_WITH_BASE))
         }
         if (entry.joma > 0) {
-            raw.add(RawTxn(entry.date, entry.memo, TxnType.JOMA, entry.joma, "", "", SRC_BASE_JOMA))
+            raw.add(RawTxn(entry.date, entry.memo, TxnType.JOMA, entry.joma, "", "", SRC_BASE_JOMA, PAIR_WITH_BASE))
         }
         entry.history.forEachIndexed { idx, h ->
             when (h.type) {
-                "bokeyoa" -> raw.add(RawTxn(h.date, h.memo, TxnType.BILL_OR_PAWNA, h.bokeyoaAmount(isCustomer = true), h.goj, h.note, idx))
-                "joma" -> raw.add(RawTxn(h.date, h.memo, TxnType.JOMA, h.joma, "", h.note, idx))
+                "bokeyoa" -> raw.add(RawTxn(h.date, h.memo, TxnType.BILL_OR_PAWNA, h.bokeyoaAmount(isCustomer = true), h.goj, h.note, idx, h.pair))
+                "joma" -> raw.add(RawTxn(h.date, h.memo, TxnType.JOMA, h.joma, "", h.note, idx, h.pair))
             }
         }
     } else {
@@ -67,16 +76,16 @@ fun buildTransactionRows(entry: Entry, isCustomer: Boolean): List<TxnRow> {
         // পুরনো এন্ট্রি — ওয়েব অ্যাপের ফলব্যাক প্যাটার্নের সাথে সামঞ্জস্যপূর্ণ)
         val initPawna = entry.initPawna ?: (entry.baki + entry.joma)
         if (initPawna > 0) {
-            raw.add(RawTxn(entry.date, entry.memo, TxnType.BILL_OR_PAWNA, initPawna, entry.goj, entry.note, SRC_BASE_BILL))
+            raw.add(RawTxn(entry.date, entry.memo, TxnType.BILL_OR_PAWNA, initPawna, entry.goj, entry.note, SRC_BASE_BILL, PAIR_WITH_BASE))
         }
         if (entry.joma > 0) {
-            raw.add(RawTxn(entry.date, entry.memo, TxnType.JOMA, entry.joma, "", "", SRC_BASE_JOMA))
+            raw.add(RawTxn(entry.date, entry.memo, TxnType.JOMA, entry.joma, "", "", SRC_BASE_JOMA, PAIR_WITH_BASE))
         }
         entry.history.forEachIndexed { idx, h ->
             when (h.type) {
                 // ওয়েব অ্যাপে মহাজনের history আইটেমে বকেয়ার পরিমাণ h.baki ফিল্ডে থাকে, h.bill এ নয়
-                "bokeyoa" -> raw.add(RawTxn(h.date, h.memo, TxnType.BILL_OR_PAWNA, h.bokeyoaAmount(isCustomer = false), h.goj, h.note, idx))
-                "joma" -> raw.add(RawTxn(h.date, h.memo, TxnType.JOMA, h.joma, "", h.note, idx))
+                "bokeyoa" -> raw.add(RawTxn(h.date, h.memo, TxnType.BILL_OR_PAWNA, h.bokeyoaAmount(isCustomer = false), h.goj, h.note, idx, h.pair))
+                "joma" -> raw.add(RawTxn(h.date, h.memo, TxnType.JOMA, h.joma, "", h.note, idx, h.pair))
             }
         }
     }
@@ -88,14 +97,13 @@ fun buildTransactionRows(entry: Entry, isCustomer: Boolean): List<TxnRow> {
     raw.clear()
     raw.addAll(sortedRaw)
 
-    // ── bill + joma merge করে এক রো-তে দেখানো — নিয়মটা সব ক্ষেত্রে সমান (তারেকের নির্দেশ) ──
-    // বকেয়া/পাওনা ফর্মে একসাথে দেওয়া জমা সবসময় সেই বিলের লাইনেই বসবে। মার্জ হয় যেকোনো একভাবে:
-    //  (১) একই (non-empty, trim করা) মেমো — ওয়েব অ্যাপের _mergeJoma প্যাটার্ন (index.html ৬১৫০-৬১৬৪);
-    //  (২) মেমো না থাকলেও: একই তারিখে বিলের ঠিক পরের JOMA রো — ফর্ম জোড়া হিসেবে সেভ হওয়া জমা
-    //      (addBokeyoa/editRow/নতুন এন্ট্রি সব জায়গায় বিলের পরপরই জমা বসে)। আগে শুধু (১) ছিল,
-    //      তাই মেমো ফাঁকা থাকলে একই ফর্মের জমা আলাদা লাইনে চলে যেত — সেটাই ছিল অসঙ্গতি।
-    // পাওয়া গেলে জমার অংশ mergedJomaAmount-এ থাকে, JOMA রো আউটপুট থেকে বাদ পড়ে
-    // (একটা JOMA একবারই কোনো একটা BILL-এর সাথে মার্জ হতে পারে)।
+    // ── bill + joma merge — নিয়ম (তারেকের নির্দেশ, 2026-11-10): শুধু একই ফর্ম থেকে ──
+    // একসাথে সেভ হওয়া জমাই বিলের লাইনে বসবে; আলাদা জমা-ফর্মের জমা কখনো নয় — একই দিনে
+    // হলেও না (তারিখ-ভিত্তিক অনুমান আগের চেষ্টায় বাতিল হয়েছে, হিসাবে ঝামেলা হয়)।
+    //  (১) pair চিহ্ন থাকলে (pair != 0): একই pair-এর JOMA-ই একমাত্র জোড়া।
+    //  (২) পুরনো/ওয়েব ডেটায় pair নেই (0): আগের মেমো-মিলের নিয়ম (ওয়েব _mergeJoma প্যাটার্ন,
+    //      index.html ৬১৫০-৬১৬৪) — শুধু চিহ্নহীন bill ও চিহ্নহীন joma-র মধ্যে।
+    // পাওয়া গেলে জমার অংশ mergedJomaAmount-এ থাকে, JOMA রো আউটপুট থেকে বাদ পড়ে।
     data class MergedTxn(
         val date: String, val memo: String, val type: TxnType,
         val amount: Double, val goj: String, val note: String,
@@ -114,12 +122,12 @@ fun buildTransactionRows(entry: Entry, isCustomer: Boolean): List<TxnRow> {
                 if (j == i || j in consumedJomaIdx) continue
                 val cand = raw[j]
                 if (cand.type != TxnType.JOMA) continue
-                val sameMemo = memoKey.isNotEmpty() && cand.memo.trim() == memoKey
-                // ফর্ম-জোড়া: একই তারিখে বিলের ঠিক পরের জমা — তবে জমার নিজের মেমো ফাঁকা হলেই
-                // (আলাদা মেমোওয়ালা জমা অন্য বিলের জোড়া হতে পারে, সেটা এই বিলে টানা যাবে না)
-                val formPair = j == i + 1 && t.date.isNotBlank() && cand.memo.trim().isEmpty() &&
-                    dateSortKey(cand.date) == dateSortKey(t.date)
-                if (sameMemo || formPair) {
+                val isMate = if (t.pair != 0L) {
+                    cand.pair == t.pair
+                } else {
+                    cand.pair == 0L && memoKey.isNotEmpty() && cand.memo.trim() == memoKey
+                }
+                if (isMate) {
                     mateIdx = j
                     break
                 }

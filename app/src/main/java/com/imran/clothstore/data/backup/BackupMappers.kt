@@ -26,11 +26,11 @@ fun Entry.toBackupEntry(): BackupEntry = BackupEntry(
 )
 
 fun BackupHistoryItem.toHistoryItem(): HistoryItem = HistoryItem(
-    type = type, date = date, memo = memo, bill = bill, baki = baki, joma = joma, goj = goj, note = note
+    type = type, date = date, memo = memo, bill = bill, baki = baki, joma = joma, goj = goj, note = note, pair = pair
 )
 
 fun HistoryItem.toBackupHistoryItem(): BackupHistoryItem = BackupHistoryItem(
-    type = type, date = date, memo = memo, bill = bill, baki = baki, joma = joma, goj = goj, note = note
+    type = type, date = date, memo = memo, bill = bill, baki = baki, joma = joma, goj = goj, note = note, pair = pair
 )
 
 fun BackupWeeklyReport.toWeeklyReport(): WeeklyReport = WeeklyReport(

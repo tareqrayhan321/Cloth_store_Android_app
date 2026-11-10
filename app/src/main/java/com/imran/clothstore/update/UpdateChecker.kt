@@ -8,7 +8,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 private const val LATEST_RELEASE_URL =
-    "https://api.github.com/repos/tareqrayhan321/test-app3/releases/latest"
+    "https://api.github.com/repos/tareqrayhan321/Cloth_store_Android_app/releases/latest"
 
 data class UpdateInfo(
     val versionName: String,

@@ -60,7 +60,14 @@ data class HistoryItem(
     /** type == "joma" হলে জমার পরিমাণ */
     val joma: Double = 0.0,
     val goj: String = "",
-    val note: String = ""
+    val note: String = "",
+    /**
+     * জোড়া-চিহ্ন (2026-11-10, তারেকের নিয়ম): একই ফর্ম থেকে একসাথে সেভ হওয়া বকেয়া+জমা
+     * একই pair মান পায় — টেবিলে শুধু সেই জমাই বিলের লাইনে মার্জ হয়। আলাদা জমা-ফর্মের
+     * জমা নিজস্ব আলাদা pair পায় (কখনো মার্জ নয়)। 0 = পুরনো/ওয়েব ডেটা (চিহ্ন নেই) —
+     * সেক্ষেত্রে আগের মেমো-মিলের নিয়মই প্রযোজ্য।
+     */
+    val pair: Long = 0L
 ) {
     /** ওয়েব অ্যাপের isCustomer ? h.bill : h.baki লজিকের সমতুল্য */
     fun bokeyoaAmount(isCustomer: Boolean): Double = if (isCustomer) bill else baki

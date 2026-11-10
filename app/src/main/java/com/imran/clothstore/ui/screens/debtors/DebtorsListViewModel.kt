@@ -125,8 +125,10 @@ class DebtorsListViewModel(
     fun addQuickJoma(row: DebtorRow, jomaAmount: Double, date: String, note: String) {
         if (jomaAmount <= 0) return
         val entry = row.entry
+        // দ্রুত-জমা আলাদা ফর্মের — নিজস্ব pair, কোনো বিলের লাইনে মার্জ হবে না
+        val soloPair = maxOf(System.currentTimeMillis(), (entry.history.maxOfOrNull { it.pair } ?: 0L) + 1)
         val newHistory = entry.history + HistoryItem(
-            type = "joma", date = date, memo = "", joma = jomaAmount, note = note
+            type = "joma", date = date, memo = "", joma = jomaAmount, note = note, pair = soloPair
         )
         val isCustomer = row.category.isCustomerType
         val netBaki = com.imran.clothstore.ui.screens.detail.currentBaki(entry.copy(history = newHistory), isCustomer)
