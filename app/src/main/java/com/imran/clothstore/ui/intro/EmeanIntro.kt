@@ -60,6 +60,12 @@ import kotlin.math.sqrt
  */
 
 private val IntroBg = Color(0xFFFBF7F2)
+
+/** আঁকার ডেটা — অ্যাপ চালুতে একবারই তৈরি (প্রথম ফ্রেমের পথে আসে না) */
+private val SEG_DRAWS: List<SegDraw> by lazy { EMEAN_SEGS.map { SegDraw(it) } }
+private val FLOWER_PATHS: List<Path> by lazy {
+    listOf(POLY_BOT, POLY_TOP, POLY_BUD).map { pathFrom(it).apply { close() } }
+}
 private const val TOTAL = 3.4f
 private const val FADE = 0.3f
 
@@ -236,19 +242,9 @@ private fun DrawScope.drawEmean(
 @Composable
 fun EmeanIntro(onDone: () -> Unit) {
     val context = LocalContext.current
-    // লোগো একবারই ডিকোড হয়; ইমব্লেম ও লেখার অংশ সেই একই বিটম্যাপ থেকে আলাদা ছোট
-    // বিটম্যাপে কেটে রাখা হয় — প্রতি ফ্রেমে পুরো 2048×682 ছবি টানতে হয় না।
-    val (emblemBmp, textBmp) = remember {
-        val full = BitmapFactory.decodeResource(context.resources, R.drawable.emean_logo)
-        val emblem = android.graphics.Bitmap.createBitmap(full, 0, 0, 625, 682).asImageBitmap()
-        val text = android.graphics.Bitmap.createBitmap(full, 625, 150, 1423, 410).asImageBitmap()
-        emblem to text
-    }
-    // আঁকার ডেটা একবারই বানানো হয় — প্রতি ফ্রেমে নয় (ল্যাগ-ফিক্স)
-    val segs = remember { EMEAN_SEGS.map { SegDraw(it) } }
-    val flowerPaths = remember {
-        listOf(POLY_BOT, POLY_TOP, POLY_BUD).map { pathFrom(it).apply { close() } }
-    }
+    // বিটম্যাপ ব্যাকগ্রাউন্ড থ্রেডে ডিকোড হয় — প্রথম ফ্রেম শুধু ক্রিম পট (স্প্ল্যাশের রঙই),
+    // ছবি তৈরি হলেই ঘড়ি শুরু; আঁকার মাঝে কোনো ভারী কাজ থাকে না।
+    var assets by remember { mutableStateOf<Pair<ImageBitmap, ImageBitmap>?>(null) }
     var t by remember { mutableStateOf(0f) }
     var finished by remember { mutableStateOf(false) }
     fun finish() {
@@ -258,6 +254,16 @@ fun EmeanIntro(onDone: () -> Unit) {
         }
     }
     LaunchedEffect(Unit) {
+        val loaded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            // আঁকার ডেটাও এখানেই গরম করে রাখা হয় (lazy) — প্রথম ফ্রেমে কোনো হিসাব নয়
+            SEG_DRAWS.size
+            FLOWER_PATHS.size
+            val full = BitmapFactory.decodeResource(context.resources, R.drawable.emean_logo)
+            val emblem = android.graphics.Bitmap.createBitmap(full, 0, 0, 625, 682).asImageBitmap()
+            val text = android.graphics.Bitmap.createBitmap(full, 625, 150, 1423, 410).asImageBitmap()
+            emblem to text
+        }
+        assets = loaded
         var start = -1L
         var prev = -1L
         var shown = 0f
@@ -289,18 +295,21 @@ fun EmeanIntro(onDone: () -> Unit) {
         Modifier.fillMaxSize().background(IntroBg).clickable { finish() },
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp).aspectRatio(2048f / 682f),
-        ) {
-            val scale = size.width / 2048f
-            withTransform({ scale(scale, scale, Offset.Zero) }) {
-                if (fadeAlpha < 1f) {
-                    // fade-লেয়ার কেবল fade-এর ০.৩ সেকেন্ডেই (আগে প্রতি ফ্রেমে বসত)
-                    drawContext.canvas.saveLayer(Rect(0f, 0f, 2048f, 682f), Paint().apply { alpha = fadeAlpha })
-                    drawEmean(emblemBmp, textBmp, segs, flowerPaths, t)
-                    drawContext.canvas.restore()
-                } else {
-                    drawEmean(emblemBmp, textBmp, segs, flowerPaths, t)
+        val a = assets
+        if (a != null) {
+            Canvas(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp).aspectRatio(2048f / 682f),
+            ) {
+                val scale = size.width / 2048f
+                withTransform({ scale(scale, scale, Offset.Zero) }) {
+                    if (fadeAlpha < 1f) {
+                        // fade-লেয়ার কেবল fade-এর ০.৩ সেকেন্ডেই (আগে প্রতি ফ্রেমে বসত)
+                        drawContext.canvas.saveLayer(Rect(0f, 0f, 2048f, 682f), Paint().apply { alpha = fadeAlpha })
+                        drawEmean(a.first, a.second, SEG_DRAWS, FLOWER_PATHS, t)
+                        drawContext.canvas.restore()
+                    } else {
+                        drawEmean(a.first, a.second, SEG_DRAWS, FLOWER_PATHS, t)
+                    }
                 }
             }
         }

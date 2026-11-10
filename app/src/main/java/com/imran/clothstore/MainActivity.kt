@@ -48,8 +48,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             ImranClothStoreTheme {
                 var introDone by remember { mutableStateOf(false) }
+                var appMounted by remember { mutableStateOf(false) }
+                // হোম স্ক্রিন ইন্ট্রোর শেষের দিকে মাউন্ট হয় — শুরুর ভারী কম্পোজিশন ও
+                // ডেটা-লোড যেন ইন্ট্রোর আঁকার পথে না আসে (আটকে যাওয়ার বড় কারণ ছিল এটাই)।
+                LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(2400)
+                    appMounted = true
+                }
                 Box(Modifier.fillMaxSize()) {
-                    AppRoot()
+                    if (appMounted || introDone) AppRoot()
                     // EMEAN মোশন ইন্ট্রো — সতেজ চালুতে একবার, ট্যাপে স্কিপ (৩.৪ সে.)
                     if (!introDone) {
                         EmeanIntro(onDone = { introDone = true })
