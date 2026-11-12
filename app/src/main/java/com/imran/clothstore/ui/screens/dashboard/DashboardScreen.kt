@@ -40,6 +40,7 @@ import com.imran.clothstore.ui.screens.reports.WeeklyReportsViewModel
 import com.imran.clothstore.util.toBengaliDigits
 import com.imran.clothstore.ui.screens.reports.formatTaka
 import com.imran.clothstore.ui.theme.AppColors
+import com.imran.clothstore.ui.theme.AppFontFamily
 
 /**
  * ওয়েব অ্যাপের "ড্যাশবোর্ড" ট্যাবের (dashScreen) সরাসরি Kotlin/Compose সংস্করণ।
@@ -181,11 +182,12 @@ fun DashboardScreen(
                 Button(
                     onClick = onPaikkariClick,
                     modifier = Modifier.padding(top = 18.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(percent = 50),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0B4A3A))
                 ) {
                     Text(
                         "সাপ্তাহিক তথ্য হালনাগাদ",
+                        fontFamily = AppFontFamily,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,

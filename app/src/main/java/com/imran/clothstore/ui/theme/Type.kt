@@ -51,5 +51,27 @@ val AppTypography = Typography(
         fontFamily = AppFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 11.sp
+    ),
+    // বাটনের লেখা labelLarge ধরে আসে — এটা না থাকলে বাটনে সিস্টেমের ডিফল্ট ফন্ট
+    // দেখাত (ড্যাশবোর্ডের "সাপ্তাহিক তথ্য হালনাগাদ" বাটনে তারেকের চোখে পড়েছিল, 2026-11-12)।
+    labelLarge = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp
+    ),
+    labelMedium = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp
+    ),
+    bodySmall = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.Normal,
+        fontSize = 11.5.sp
+    ),
+    titleSmall = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 13.sp
     )
 )

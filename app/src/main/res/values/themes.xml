@@ -6,7 +6,7 @@
     </style>
 
     <!-- খোলার মুহূর্তের (Android SplashScreen API) থিম: গোল লোগোর স্থির স্প্ল্যাশ বাদ —
-         শুধু ক্রিম পট, তারপর সরাসরি EMEAN মোশন ইন্ট্রো; শেষে Theme.ImranClothStore-এ ফেরে -->
+         শুধু সাদা পট, তারপর সরাসরি EMEAN মোশন ইন্ট্রো; শেষে Theme.ImranClothStore-এ ফেরে -->
     <style name="Theme.ImranClothStore.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/emean_splash_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_blank</item>

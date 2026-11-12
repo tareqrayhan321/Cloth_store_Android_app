@@ -7,8 +7,13 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-private const val LATEST_RELEASE_URL =
-    "https://api.github.com/repos/tareqrayhan321/Cloth_store_Android_app/releases/latest"
+// GitHub API নয় — প্রতিটা রিলিজে asset হিসেবে থাকা version.json সরাসরি
+// ডাউনলোড-লিংক থেকে পড়া হয় (releases/latest/download/… নিজে থেকেই সর্বশেষ
+// রিলিজে redirect করে)। আগের API-পথ unauthenticated rate-limit-এ (শেয়ার্ড
+// IP-তে 403) আটকে যেত বলে ফোনে আপডেট-পপআপ আসত না — তাই এই পথ (2026-11-12)।
+// version.json রিলিজ workflow প্রতিবার বানিয়ে রিলিজে asset করে দেয়।
+private const val VERSION_JSON_URL =
+    "https://github.com/tareqrayhan321/Cloth_store_Android_app/releases/latest/download/version.json"
 
 data class UpdateInfo(
     val versionName: String,
@@ -19,39 +24,27 @@ data class UpdateInfo(
 object UpdateChecker {
     suspend fun check(): UpdateInfo? = withContext(Dispatchers.IO) {
         try {
-            val connection = (URL(LATEST_RELEASE_URL).openConnection() as HttpURLConnection).apply {
+            val connection = (URL(VERSION_JSON_URL).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 5_000
                 readTimeout = 5_000
-                setRequestProperty("Accept", "application/vnd.github+json")
+                instanceFollowRedirects = true
                 setRequestProperty("User-Agent", "ClothStore/${BuildConfig.VERSION_NAME}")
             }
 
             try {
                 val http = connection
                 if (http.responseCode !in 200..299) return@withContext null
-                val release = JSONObject(http.inputStream.bufferedReader().use { it.readText() })
-                val remoteVersion = release.optString("tag_name").removePrefix("v")
+                val json = JSONObject(http.inputStream.bufferedReader().use { it.readText() })
+                val remoteVersion = json.optString("versionName").removePrefix("v")
                 if (remoteVersion.isBlank() || !isNewer(remoteVersion, BuildConfig.VERSION_NAME)) {
                     return@withContext null
                 }
 
-                var apkUrl: String? = null
-                val assets = release.optJSONArray("assets")
-                if (assets != null) {
-                    for (index in 0 until assets.length()) {
-                        val asset = assets.optJSONObject(index) ?: continue
-                        if (asset.optString("name").endsWith(".apk", ignoreCase = true)) {
-                            apkUrl = asset.optString("browser_download_url").takeIf { it.isNotBlank() }
-                            break
-                        }
-                    }
-                }
-
                 UpdateInfo(
                     versionName = remoteVersion,
-                    releaseUrl = release.optString("html_url"),
-                    apkUrl = apkUrl
+                    releaseUrl = json.optString("releaseUrl"),
+                    apkUrl = json.optString("apkUrl").takeIf { it.isNotBlank() }
                 )
             } finally {
                 connection.disconnect()

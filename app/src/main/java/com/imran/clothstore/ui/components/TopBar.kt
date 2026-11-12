@@ -74,7 +74,7 @@ fun AppTopBar(
                 Image(
                     painter = painterResource(R.drawable.emean_emblem_cream),
                     contentDescription = null,
-                    modifier = Modifier.height(38.dp)
+                    modifier = Modifier.height(46.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {

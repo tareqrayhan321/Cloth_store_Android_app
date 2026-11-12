@@ -41,7 +41,7 @@ import com.imran.clothstore.ui.theme.ImranClothStoreTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        // সিস্টেম স্প্ল্যাশ (ক্রিম পট, কোনো স্থির লোগো নয়) — setContent-এর আগে
+        // সিস্টেম স্প্ল্যাশ (সাদা পট, কোনো স্থির লোগো নয়) — setContent-এর আগে
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

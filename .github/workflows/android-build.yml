@@ -161,10 +161,15 @@ jobs:
 
           The release keystore is not included.
           EOF
+          # UpdateChecker GitHub API পড়ে না — এই version.json asset-টাই পড়ে
+          # (releases/latest/download/version.json)। প্রতি রিলিজে বাধ্যতামূলক।
+          cat > dist/version.json <<EOF
+          {"versionName": "${VERSION_NAME}", "versionCode": ${VERSION_CODE}, "apkUrl": "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/clothstore-${GITHUB_REF_NAME}.apk", "releaseUrl": "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"}
+          EOF
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$APK" --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload "$GITHUB_REF_NAME" "$APK" dist/version.json --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "$APK" --repo "$GITHUB_REPOSITORY" --title "ClothStore ${GITHUB_REF_NAME}" --notes-file dist/release-notes.md
+            gh release create "$GITHUB_REF_NAME" "$APK" dist/version.json --repo "$GITHUB_REPOSITORY" --title "ClothStore ${GITHUB_REF_NAME}" --notes-file dist/release-notes.md
           fi
 
       - name: Send APK to Telegram
