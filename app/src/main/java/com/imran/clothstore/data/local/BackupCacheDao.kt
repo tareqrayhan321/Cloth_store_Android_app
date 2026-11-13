@@ -25,4 +25,8 @@ interface BackupCacheDao {
 
     @Query("SELECT pendingSync FROM backup_cache WHERE id = 0")
     suspend fun isPendingSync(): Boolean?
+
+    /** কিল-সুইচের (AccessGate) মোছার জন্য — ক্যাশের একমাত্র রো-টাই মুছে দেয় */
+    @Query("DELETE FROM backup_cache")
+    suspend fun clearAll()
 }

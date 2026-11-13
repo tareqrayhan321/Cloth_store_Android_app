@@ -32,6 +32,11 @@ import com.imran.clothstore.navigation.AppNavGraph
 import com.imran.clothstore.navigation.Routes
 import com.imran.clothstore.update.UpdateChecker
 import com.imran.clothstore.update.UpdateInfo
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.text.style.TextAlign
+import com.imran.clothstore.access.AccessGate
 import com.imran.clothstore.ui.components.BottomNavBar
 import com.imran.clothstore.ui.components.BottomNavTab
 import com.imran.clothstore.ui.screens.menu.SideMenu
@@ -66,9 +71,15 @@ private fun AppRoot() {
     val currentRoute = backStackEntry?.destination?.route
     var menuOpen by remember { mutableStateOf(false) }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+    val blocked by AccessGate.blocked.collectAsState()
 
     LaunchedEffect(Unit) {
         updateInfo = UpdateChecker.check()
+    }
+
+    if (blocked) {
+        BlockedScreen()
+        return
     }
 
     AppRootContent(
@@ -105,17 +116,14 @@ private fun AppRoot() {
     updateInfo?.let { info ->
         UpdateDialog(
             info = info,
-            onLater = { updateInfo = null },
             onUpdate = {
                 val target = info.apkUrl ?: info.releaseUrl
                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
-                updateInfo = null
             },
             onTelegram = {
                 context.startActivity(
                     Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/Applibrarybot?start=update"))
                 )
-                updateInfo = null
             }
         )
     }
@@ -124,16 +132,18 @@ private fun AppRoot() {
 @Composable
 private fun UpdateDialog(
     info: UpdateInfo,
-    onLater: () -> Unit,
     onUpdate: () -> Unit,
     onTelegram: () -> Unit
 ) {
+    // বাধ্যতামূলক আপডেট (v1.1.5 থেকে, মালিকের নির্দেশ): "পরে করব" বোতাম নেই,
+    // ডায়ালগ বাইরে চাপ দিয়ে বা ব্যাক বোতামেও বন্ধ হয় না — আপডেট না করা
+    // পর্যন্ত ডায়ালগ থেকেই যাবে (আপডেটের পর নতুন ভার্সনে আর আসবে না)।
     AlertDialog(
-        onDismissRequest = onLater,
+        onDismissRequest = { },
         title = { Text("নতুন আপডেট আছে") },
         text = {
             Column {
-                Text("ClothStore-এর নতুন ভার্সন ${info.versionName} পাওয়া গেছে। এখন আপডেট করবেন?")
+                Text("ClothStore-এর নতুন ভার্সন ${info.versionName} এসেছে। এই আপডেটটা করা বাধ্যতামূলক — আপডেট না করলে অ্যাপ ব্যবহার করা যাবে না।")
                 Spacer(modifier = Modifier.height(8.dp))
                 TextButton(onClick = onTelegram) {
                     Text("Telegram থেকে APK নিন")
@@ -144,13 +154,31 @@ private fun UpdateDialog(
             Button(onClick = onUpdate) {
                 Text("আপডেট করুন")
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onLater) {
-                Text("পরে করব")
-            }
         }
     )
+}
+
+@Composable
+private fun BlockedScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(24.dp)
+        ) {
+            Text(
+                text = "এই ডিভাইস অনুমোদিত নয়",
+                style = MaterialTheme.typography.titleLarge
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "দোকানের ডাটা এই ফোন থেকে মুছে দেওয়া হয়েছে।\nব্যবহারের অনুমতির জন্য দোকানের মালিকের সাথে যোগাযোগ করুন।",
+                textAlign = TextAlign.Center
+            )
+        }
+    }
 }
 
 @Composable

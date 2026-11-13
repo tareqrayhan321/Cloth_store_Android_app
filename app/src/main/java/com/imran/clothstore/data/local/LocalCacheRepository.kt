@@ -57,4 +57,7 @@ class LocalCacheRepository(private val dao: BackupCacheDao) {
     }
 
     suspend fun hasPendingSync(): Boolean = dao.isPendingSync() ?: false
+
+    /** কিল-সুইচ (AccessGate) লোকাল ক্যাশ পুরোপুরি মোছার জন্য */
+    suspend fun clear() = withContext(Dispatchers.Default) { dao.clearAll() }
 }

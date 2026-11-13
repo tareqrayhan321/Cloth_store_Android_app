@@ -5,6 +5,7 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
 import com.imran.clothstore.access.DeviceRegistry
+import com.imran.clothstore.access.AccessGate
 import com.imran.clothstore.data.backup.BackupRepository
 import com.imran.clothstore.data.local.AppDatabase
 import com.imran.clothstore.data.local.LocalCacheRepository
@@ -33,6 +34,7 @@ class ClothStoreApplication : Application() {
             AppDatabase.getInstance(applicationContext).backupCacheDao()
         )
         AppSingletons.appContext = applicationContext
+        AccessGate.init(applicationContext)
 
         // Firestore rules-এ request.auth != null চেক পাস করাতে অ্যানোনিমাস সাইন-ইন।
         try {
@@ -61,6 +63,7 @@ class ClothStoreApplication : Application() {
     /** Auth সম্পন্ন হলে listener এবং cold-start pull—দুটোই চালু করে। */
     private fun startAuthenticatedSync() {
         DeviceRegistry.register()
+        AccessGate.verify()
         SyncWorker.schedulePeriodic(applicationContext)
         startBackupListener()
         // নতুন install-এর Room cache খালি থাকে; initial listener event-এর অপেক্ষা না করে
