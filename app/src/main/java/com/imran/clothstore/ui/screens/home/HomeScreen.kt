@@ -212,6 +212,7 @@ fun HomeScreenPreview() {
             override suspend fun getOnce() = null
             override suspend fun upsert(entity: BackupCacheEntity) = 0L
             override suspend fun isPendingSync() = false
+            override suspend fun clearAll() { }
         }
         AppSingletons.localCacheRepository = LocalCacheRepository(dummyDao)
     }
