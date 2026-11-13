@@ -36,7 +36,6 @@ import com.imran.clothstore.ui.components.BottomNavBar
 import com.imran.clothstore.ui.components.BottomNavTab
 import com.imran.clothstore.ui.screens.menu.SideMenu
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.imran.clothstore.ui.intro.EmeanIntro
 import com.imran.clothstore.ui.theme.ImranClothStoreTheme
 
 class MainActivity : ComponentActivity() {
@@ -47,21 +46,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ImranClothStoreTheme {
-                var introDone by remember { mutableStateOf(false) }
-                var appMounted by remember { mutableStateOf(false) }
-                // হোম স্ক্রিন ইন্ট্রোর শেষের দিকে মাউন্ট হয় — শুরুর ভারী কম্পোজিশন ও
-                // ডেটা-লোড যেন ইন্ট্রোর আঁকার পথে না আসে (আটকে যাওয়ার বড় কারণ ছিল এটাই)।
-                LaunchedEffect(Unit) {
-                    kotlinx.coroutines.delay(2400)
-                    appMounted = true
-                }
-                Box(Modifier.fillMaxSize()) {
-                    if (appMounted || introDone) AppRoot()
-                    // EMEAN মোশন ইন্ট্রো — সতেজ চালুতে একবার, ট্যাপে স্কিপ (৩.৪ সে.)
-                    if (!introDone) {
-                        EmeanIntro(onDone = { introDone = true })
-                    }
-                }
+                AppRoot()
             }
         }
     }
