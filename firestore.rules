@@ -2,8 +2,20 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // মালিকের ডিভাইস (তারেকের ফোন, v1.1.4-এ নিবন্ধিত) — শুধু এই UID-ই দোকানের ডেটা পাবে।
+    function isOwner() {
+      return request.auth != null && request.auth.uid == 'c7ohrewCZZbzqeyE0UJc22Dpm1K2';
+    }
+
+    // ডিভাইস নিবন্ধন: যেকোনো সাইন-ইন করা ডিভাইস শুধু নিজের ডকটাই লিখতে/পড়তে পারবে
+    // (ভবিষ্যতে বৈধ ব্যবহারকারী যোগ করতে এই পথ লাগে)।
+    match /devices/{deviceId} {
+      allow get, create, update: if request.auth != null && request.auth.uid == deviceId;
+    }
+
+    // দোকানের বাকি সব ডেটা: শুধু মালিক
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isOwner();
     }
   }
 }
