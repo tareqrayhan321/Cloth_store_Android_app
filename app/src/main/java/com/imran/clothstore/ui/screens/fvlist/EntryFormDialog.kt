@@ -36,6 +36,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,6 +60,7 @@ import com.imran.clothstore.ui.components.AppTextField
 import com.imran.clothstore.ui.theme.AppColors
 import coil.compose.AsyncImage
 import com.imran.clothstore.data.model.Entry
+import com.imran.clothstore.access.ContactsVault
 import com.imran.clothstore.util.PhotoUpload
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -93,6 +95,7 @@ fun EntryFormDialog(
     var photoUploading by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val numbersAllowed by ContactsVault.allowed.collectAsState()
     val scope = rememberCoroutineScope()
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -185,14 +188,17 @@ fun EntryFormDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    AppTextField(
-                        value = mob,
-                        onValueChange = { mob = it },
-                        label = "মোবাইল",
-                        modifier = Modifier.weight(1f),
-                        keyboardType = KeyboardType.Phone,
-                        leadingIcon = { Text("+88", fontWeight = FontWeight.Bold, fontSize = 14.sp) }
-                    )
+                    // নাম্বারের ঘর শুধু বৈধ ডিভাইসে (v1.1.6) — অবৈধরা নাম্বার দেখেও না, লিখতেও পারে না
+                    if (numbersAllowed) {
+                        AppTextField(
+                            value = mob,
+                            onValueChange = { mob = it },
+                            label = "মোবাইল",
+                            modifier = Modifier.weight(1f),
+                            keyboardType = KeyboardType.Phone,
+                            leadingIcon = { Text("+88", fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+                        )
+                    }
                     AppDateField(date, { date = it }, "তারিখ", Modifier.weight(1f))
                 }
 

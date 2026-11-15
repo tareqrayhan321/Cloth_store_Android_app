@@ -6,6 +6,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
 import com.imran.clothstore.access.DeviceRegistry
 import com.imran.clothstore.access.AccessGate
+import com.imran.clothstore.access.ContactsVault
 import com.imran.clothstore.data.backup.BackupRepository
 import com.imran.clothstore.data.local.AppDatabase
 import com.imran.clothstore.data.local.LocalCacheRepository
@@ -35,6 +36,7 @@ class ClothStoreApplication : Application() {
         )
         AppSingletons.appContext = applicationContext
         AccessGate.init(applicationContext)
+        ContactsVault.init(applicationContext)
 
         // Firestore rules-এ request.auth != null চেক পাস করাতে অ্যানোনিমাস সাইন-ইন।
         try {

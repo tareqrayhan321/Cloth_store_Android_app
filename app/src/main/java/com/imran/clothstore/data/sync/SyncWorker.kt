@@ -15,6 +15,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.imran.clothstore.data.backup.BackupPayload
 import com.imran.clothstore.data.backup.BackupRepository
+import com.imran.clothstore.data.backup.MobsCodec
+import com.imran.clothstore.access.ContactsVault
 import com.imran.clothstore.data.local.AppDatabase
 import com.imran.clothstore.data.local.LocalCacheRepository
 import com.imran.clothstore.ui.screens.notif.NotificationCenter
@@ -76,23 +78,97 @@ class SyncWorker(
                 "Remote backup loaded: parties=${remotePayload.is_c1_list.size + remotePayload.is_c2_list.size + remotePayload.is_c3_list.size + remotePayload.is_c4_list.size}, weekly=${remotePayload.chart_data.size}, fabric=${remotePayload.fabricPurchaseData_v2.size}"
             )
 
-            val merged: BackupPayload = if (hasPending) {
-                SyncEngine.merge(local = localPayload, remote = remotePayload)
+            // ── মোবাইল নাম্বার (v1.1.6): contacts ডক পড়া গেলেই এই ডিভাইস বৈধ ──
+            // backup ডকে কখনো নাম্বার push হয় না; বৈধ ডিভাইসে নাম্বার contacts থেকে
+            // এনে Room-এ মিলিয়ে রাখা হয়, অবৈধ ডিভাইসে Room-ও নাম্বারছাড়া থাকে।
+            var mobs: Map<Long, String>? = null
+            try {
+                mobs = ContactsVault.fetchMobs()
+            } catch (e: Exception) {
+                if (ContactsVault.isDenied(e)) {
+                    mobs = null
+                } else {
+                    // নেট-জনিত অনিশ্চয়তায় কোনো সিদ্ধান্ত নয় — পরে আবার চেষ্টা হবে
+                    Log.w(TAG, "Contacts fetch inconclusive; retrying sync", e)
+                    return Result.retry()
+                }
+            }
+            val numbersAllowed = mobs != null
+            ContactsVault.setAllowed(numbersAllowed)
+            var migration = false
+            if (numbersAllowed) {
+                // মাইগ্রেশন/উদ্ধার: backup ডকে এখনো নাম্বার থাকলে (পুরনো ভার্সনের লেখা
+                // বা ওয়েব অ্যাপের push) সেগুলো contacts-এ তুলে নেওয়া হয় — এরপরের
+                // push-এই backup নাম্বারছাড়া হয়ে যায়, কোনো নাম্বার হারায় না
+                val remoteMobs = MobsCodec.extractMobs(remotePayload)
+                if (remoteMobs.isNotEmpty()) {
+                    val harvested = (mobs ?: emptyMap()) + remoteMobs +
+                        MobsCodec.extractMobs(localPayload)
+                    try {
+                        ContactsVault.pushMobs(harvested)
+                        mobs = harvested
+                        migration = true
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Contacts harvest push failed; retrying sync", e)
+                        return Result.retry()
+                    }
+                }
+            }
+
+            val localForMerge =
+                if (numbersAllowed) localPayload else MobsCodec.stripMobs(localPayload)
+            val mergedRaw: BackupPayload = if (hasPending) {
+                SyncEngine.merge(local = localForMerge, remote = remotePayload)
             } else {
                 // কোনো স্থানীয় পরিবর্তন পেন্ডিং নেই — শুধু remote-কে সত্য ধরে নেওয়া (সাধারণ pull)
                 remotePayload
+            }
+            val merged: BackupPayload = if (numbersAllowed) {
+                MobsCodec.applyMobs(mergedRaw, mobs ?: emptyMap())
+            } else {
+                MobsCodec.stripMobs(mergedRaw)
+            }
+
+            // বৈধ ডিভাইসের নতুন/বদলানো/মোছা নাম্বার contacts-এ প্রতিফলিত করা
+            if (numbersAllowed && (hasPending || migration)) {
+                val dead = MobsCodec.tombstonedIds(merged)
+                val present = MobsCodec.entryIds(merged)
+                val desired = (MobsCodec.extractMobs(merged) +
+                    (mobs ?: emptyMap()).filterKeys { it !in present && it !in dead })
+                    .filterKeys { it !in dead }
+                if (desired != mobs) {
+                    try {
+                        ContactsVault.pushMobs(desired)
+                        mobs = desired
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Contacts push failed; retrying sync", e)
+                        return Result.retry()
+                    }
+                }
             }
 
             if (hasPending) {
                 // set().await() শুধু সার্ভার নিশ্চিত করলেই শেষ হয়; অফলাইনে চিরকাল ঝুলে থাকত — তাই টাইমআউট
                 try {
-                    withTimeout(PUSH_TIMEOUT_MS) { repository.pushToRemote(merged) }
+                    withTimeout(PUSH_TIMEOUT_MS) {
+                        repository.pushToRemote(MobsCodec.stripMobs(merged))
+                    }
                 } catch (e: TimeoutCancellationException) {
                     Log.w(TAG, "Firestore push timed out", e)
                     notifyFailure(IllegalStateException("সার্ভার সাড়া দেয়নি (ইন্টারনেট ধীর বা বন্ধ)"))
                     return Result.retry()
                 }
                 notifySuccess()
+            } else if (migration) {
+                // পেন্ডিং বদল না থাকলেও মাইগ্রেশনের পর backup ডক নাম্বারছাড়া করা বাধ্যতামূলক
+                try {
+                    withTimeout(PUSH_TIMEOUT_MS) {
+                        repository.pushToRemote(MobsCodec.stripMobs(merged))
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Migration strip push failed; retrying sync", e)
+                    return Result.retry()
+                }
             }
             // নেটওয়ার্কে থাকাকালীন ইউজার নতুন কিছু এডিট করে থাকলে (updatedAt বাদে হুবহু তুলনা),
             // পুরনো merged দিয়ে সেটা ওভাররাইট করা হয় না এবং pendingSync-ও true-ই থাকে।

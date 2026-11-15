@@ -8,6 +8,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
 import com.imran.clothstore.AppSingletons
+import com.imran.clothstore.data.backup.MobsCodec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -60,11 +61,13 @@ object AccessGate {
     fun verify() {
         val context = appContext ?: return
         scope.launch {
+            var backupOk = false
             try {
                 FirebaseFirestore.getInstance()
                     .collection("imran_store").document("backup")
                     .get(Source.SERVER)
                     .await()
+                backupOk = true
                 if (_blocked.value) {
                     prefs().edit().putBoolean(KEY_BLOCKED, false).apply()
                     _blocked.value = false
@@ -80,6 +83,48 @@ object AccessGate {
             } catch (e: Exception) {
                 Log.w(TAG, "access check failed", e)
             }
+            // ধাপ ২ (v1.1.6): backup পড়া গেলেও নাম্বার-ভল্ট আলাদা করে যাচাই হয়
+            if (backupOk) checkContacts()
+        }
+    }
+
+    /**
+     * নাম্বার-ভল্ট যাচাই (v1.1.6): `imran_store/contacts` সার্ভার থেকে পড়া গেলে
+     * ডিভাইস বৈধ — নাম্বার দেখা যাবে। PERMISSION_DENIED হলে ডিভাইস বৈধ নয়:
+     * অ্যাপ লক হয় না, লেনদেনের ডাটাও মোছে না — শুধু লোকাল ক্যাশে জমে থাকা
+     * নাম্বারগুলো মুছে যায় (পুরনো ভার্সনের ক্যাশে নাম্বার থেকে যেতে পারে)।
+     * অন্য এররে (নেট নেই ইত্যাদি) কোনো সিদ্ধান্ত নয় — আগের অবস্থাই থাকে।
+     */
+    private suspend fun checkContacts() {
+        try {
+            ContactsVault.fetchMobs(Source.SERVER)
+            ContactsVault.setAllowed(true)
+            Log.d(TAG, "contacts access verified (valid device)")
+        } catch (e: Exception) {
+            if (ContactsVault.isDenied(e)) {
+                ContactsVault.setAllowed(false)
+                stripLocalNumbers()
+                Log.w(TAG, "contacts denied — numbers hidden on this device")
+            } else {
+                Log.w(TAG, "contacts check inconclusive", e)
+            }
+        }
+    }
+
+    /**
+     * অবৈধ ডিভাইসের লোকাল ক্যাশ থেকে শুধু নাম্বার মোছা — এন্ট্রি/হিসাব সব থাকে।
+     * pendingSync পতাকা আগের মতোই রাখা হয়, যাতে অফলাইনে করা এন্ট্রি হারিয়ে না যায়।
+     */
+    private suspend fun stripLocalNumbers() {
+        try {
+            val local = AppSingletons.localCacheRepository
+            val payload = local.getOnce()
+            if (MobsCodec.extractMobs(payload).isNotEmpty()) {
+                val pending = local.hasPendingSync()
+                local.save(MobsCodec.stripMobs(payload), markPendingSync = pending)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "local number strip failed", e)
         }
     }
 
